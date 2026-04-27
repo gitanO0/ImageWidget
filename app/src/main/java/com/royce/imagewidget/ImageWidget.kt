@@ -44,6 +44,7 @@ import androidx.glance.unit.ColorProvider
 class ImageWidget : GlanceAppWidget() {
 
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
+    override val sizeMode: androidx.glance.appwidget.SizeMode = androidx.glance.appwidget.SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: androidx.glance.GlanceId) {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)

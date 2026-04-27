@@ -11,7 +11,7 @@ android {
         applicationId = "com.royce.imagewidget"
         minSdk = 24
         versionCode = 3
-        versionName = "1.18"
+        versionName = "1.21"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
