@@ -1,7 +1,6 @@
 package com.royce.imagewidget
 
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
@@ -14,8 +13,6 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import java.io.File
-import java.time.Instant
-import java.time.LocalTime
 import java.util.concurrent.ConcurrentHashMap
 
 object WidgetMutexManager {
@@ -27,7 +24,7 @@ object WidgetMutexManager {
 
 class ImageRefreshWorker(
     appContext: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -43,21 +40,26 @@ class ImageRefreshWorker(
         val isManual = inputData.getBoolean(KEY_IS_MANUAL, false)
         
         // Skip night logic
-        if (!isManual && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)) {
+        if (!isManual) {
             val skipNight = WidgetState.getSkipNight(applicationContext, widgetId)
             if (skipNight) {
                 val startStr = WidgetState.getSkipStart(applicationContext, widgetId)
                 val endStr = WidgetState.getSkipEnd(applicationContext, widgetId)
                 try {
-                    val now = LocalTime.now()
-                    val start = LocalTime.parse(startStr)
-                    val end = LocalTime.parse(endStr)
+                    val calNow = java.util.Calendar.getInstance()
+                    val nowMinutes = calNow.get(java.util.Calendar.HOUR_OF_DAY) * 60 + calNow.get(java.util.Calendar.MINUTE)
                     
-                    val isSkipping = if (start.isBefore(end)) {
-                        now.isAfter(start) && now.isBefore(end)
+                    val startParts = startStr.split(":")
+                    val startMinutes = startParts[0].toInt() * 60 + startParts[1].toInt()
+                    
+                    val endParts = endStr.split(":")
+                    val endMinutes = endParts[0].toInt() * 60 + endParts[1].toInt()
+                    
+                    val isSkipping = if (startMinutes < endMinutes) {
+                        nowMinutes in startMinutes..endMinutes
                     } else {
                         // Overlapping midnight (e.g., 22:00 to 06:00)
-                        now.isAfter(start) || now.isBefore(end)
+                        nowMinutes >= startMinutes || nowMinutes <= endMinutes
                     }
                     
                     if (isSkipping) {
@@ -100,7 +102,7 @@ class ImageRefreshWorker(
                             connect()
                         }
 
-                        if (lastConn.responseCode in 301..303 || lastConn.responseCode == 307 || lastConn.responseCode == 308) {
+                        if ((lastConn.responseCode in 301..303) || lastConn.responseCode == 307 || lastConn.responseCode == 308) {
                             val location = lastConn.getHeaderField("Location")
                             if (location != null) {
                                 currentUrl = location
@@ -158,9 +160,7 @@ class ImageRefreshWorker(
                 }
                 
                 if (finalFile.exists() && finalFile.length() > 0) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        WidgetState.setLastUpdated(applicationContext, widgetId, Instant.now().toString())
-                    }
+                    WidgetState.setLastUpdated(applicationContext, widgetId, System.currentTimeMillis().toString())
                     updateWidgetStatus(widgetId, "OK")
                     Log.d("ImageWorker", "[SUCCESS] ID: $widgetId")
                     Result.success()

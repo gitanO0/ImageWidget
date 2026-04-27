@@ -2,7 +2,6 @@ package com.royce.imagewidget
 
 import android.content.Context
 import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.glance.action.ActionParameters
 import org.json.JSONObject
 import java.io.File
@@ -21,6 +20,8 @@ object WidgetState {
     private const val KEY_MANUAL_ONLY = "manual_only_"
     private const val KEY_SCALE_TYPE = "scale_type_"
     private const val KEY_ZOOM_FACTOR = "zoom_factor_"
+    private const val KEY_ZOOM_CENTER_X = "zoom_center_x_"
+    private const val KEY_ZOOM_CENTER_Y = "zoom_center_y_"
     private const val KEY_SKIP_NIGHT = "skip_night_"
     private const val KEY_SKIP_START = "skip_start_"
     private const val KEY_SKIP_END = "skip_end_"
@@ -41,6 +42,8 @@ object WidgetState {
         val rate: Int,
         val scale: String,
         val zoom: Float,
+        val zoomCenterX: Float = 0.5f,
+        val zoomCenterY: Float = 0.5f,
         val manual: Boolean,
         val skipNight: Boolean,
         val skipStart: String,
@@ -52,6 +55,8 @@ object WidgetState {
             json.put("rate", rate)
             json.put("scale", scale)
             json.put("zoom", zoom.toDouble())
+            json.put("zoomCenterX", zoomCenterX.toDouble())
+            json.put("zoomCenterY", zoomCenterY.toDouble())
             json.put("manual", manual)
             json.put("skipNight", skipNight)
             json.put("skipStart", skipStart)
@@ -68,6 +73,8 @@ object WidgetState {
                     rate = json.getInt("rate"),
                     scale = json.getString("scale"),
                     zoom = json.getDouble("zoom").toFloat(),
+                    zoomCenterX = json.optDouble("zoomCenterX", 0.5).toFloat(),
+                    zoomCenterY = json.optDouble("zoomCenterY", 0.5).toFloat(),
                     manual = json.getBoolean("manual"),
                     skipNight = json.optBoolean("skipNight", true),
                     skipStart = json.optString("skipStart", "00:00"),
@@ -77,13 +84,14 @@ object WidgetState {
         }
     }
 
-    fun saveProfile(context: Context, profile: WidgetProfile) {
-        getProfilePrefs(context).edit { putString(profile.name, profile.toJson()) }
+    @android.annotation.SuppressLint("ApplySharedPref")
+    fun saveProfile(context: Context, profile: WidgetProfile): Boolean {
+        return getProfilePrefs(context).edit().putString(profile.name, profile.toJson()).commit()
     }
 
     fun getProfiles(context: Context): List<WidgetProfile> {
         val prefs = getProfilePrefs(context)
-        return prefs.all.mapNotNull { (name, json) ->
+        return prefs.all.asSequence().mapNotNull { (name, json) ->
             if (json is String) {
                 try {
                     WidgetProfile.fromJson(name, json)
@@ -91,7 +99,7 @@ object WidgetState {
                     null
                 }
             } else null
-        }.sortedBy { it.name }
+        }.toList().sortedBy { it.name }
     }
 
     fun imageFile(context: Context, widgetId: Int): File {
@@ -123,18 +131,28 @@ object WidgetState {
         return getPrefs(context).getString(KEY_LAST_UPDATED + widgetId, "Never") ?: "Never"
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     fun getLastUpdatedFormatted(context: Context, widgetId: Int): String {
         val raw = getLastUpdatedRaw(context, widgetId)
         if (raw == "Never") return raw
 
         return try {
-            val instant = Instant.parse(raw)
-            val formatter = DateTimeFormatter.ofPattern("HH:mm - M/d")
-                .withZone(ZoneId.systemDefault())
-            formatter.format(instant)
+            val timeMillis = raw.toLong()
+            val formatter = java.text.SimpleDateFormat("HH:mm - M/d", java.util.Locale.getDefault())
+            formatter.format(java.util.Date(timeMillis))
         } catch (_: Exception) {
-            raw
+            // Fallback for old ISO-8601 strings if they still exist from previous versions
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val instant = Instant.parse(raw)
+                    val formatter = DateTimeFormatter.ofPattern("HH:mm - M/d")
+                        .withZone(ZoneId.systemDefault())
+                    formatter.format(instant)
+                } else {
+                    raw
+                }
+            } catch (_: Exception) {
+                raw
+            }
         }
     }
 
@@ -160,6 +178,22 @@ object WidgetState {
 
     fun getZoomFactor(context: Context, widgetId: Int): Float {
         return getPrefs(context).getFloat(KEY_ZOOM_FACTOR + widgetId, 1.0f)
+    }
+
+    fun setZoomCenterX(context: Context, widgetId: Int, value: Float) {
+        getPrefs(context).edit { putFloat(KEY_ZOOM_CENTER_X + widgetId, value) }
+    }
+
+    fun getZoomCenterX(context: Context, widgetId: Int): Float {
+        return getPrefs(context).getFloat(KEY_ZOOM_CENTER_X + widgetId, 0.5f)
+    }
+
+    fun setZoomCenterY(context: Context, widgetId: Int, value: Float) {
+        getPrefs(context).edit { putFloat(KEY_ZOOM_CENTER_Y + widgetId, value) }
+    }
+
+    fun getZoomCenterY(context: Context, widgetId: Int): Float {
+        return getPrefs(context).getFloat(KEY_ZOOM_CENTER_Y + widgetId, 0.5f)
     }
 
     fun setSkipNight(context: Context, widgetId: Int, value: Boolean) {
@@ -195,6 +229,8 @@ object WidgetState {
                 .remove(KEY_MANUAL_ONLY + widgetId)
                 .remove(KEY_SCALE_TYPE + widgetId)
                 .remove(KEY_ZOOM_FACTOR + widgetId)
+                .remove(KEY_ZOOM_CENTER_X + widgetId)
+                .remove(KEY_ZOOM_CENTER_Y + widgetId)
                 .remove(KEY_SKIP_NIGHT + widgetId)
                 .remove(KEY_SKIP_START + widgetId)
                 .remove(KEY_SKIP_END + widgetId)

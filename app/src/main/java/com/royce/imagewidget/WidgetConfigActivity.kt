@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
@@ -45,6 +46,8 @@ class WidgetConfigActivity : ComponentActivity() {
         val currentScale = WidgetState.getScaleType(this, appWidgetId)
         val currentManual = WidgetState.getManualOnly(this, appWidgetId)
         val currentZoom = WidgetState.getZoomFactor(this, appWidgetId)
+        val currentZoomCenterX = WidgetState.getZoomCenterX(this, appWidgetId)
+        val currentZoomCenterY = WidgetState.getZoomCenterY(this, appWidgetId)
         val currentSkipNight = WidgetState.getSkipNight(this, appWidgetId)
         val currentSkipStart = WidgetState.getSkipStart(this, appWidgetId)
         val currentSkipEnd = WidgetState.getSkipEnd(this, appWidgetId)
@@ -58,24 +61,27 @@ class WidgetConfigActivity : ComponentActivity() {
                         initialScale = currentScale,
                         initialManual = currentManual,
                         initialZoom = currentZoom,
+                        initialZoomCenterX = currentZoomCenterX,
+                        initialZoomCenterY = currentZoomCenterY,
                         initialSkipNight = currentSkipNight,
                         initialSkipStart = currentSkipStart,
                         initialSkipEnd = currentSkipEnd,
-                        onSave = { url, rate, scale, manual, zoom, skipNight, start, end -> 
-                            saveConfig(url, rate, scale, manual, zoom, skipNight, start, end) 
-                        }
-                    )
+                    ) { url, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end -> 
+                        saveConfig(url, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end) 
+                    }
                 }
             }
         }
     }
 
-    private fun saveConfig(url: String, rate: Int, scale: String, manual: Boolean, zoom: Float, skipNight: Boolean, skipStart: String, skipEnd: String) {
+    private fun saveConfig(url: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String) {
         WidgetState.setUrl(this, appWidgetId, url)
         WidgetState.setRefreshRate(this, appWidgetId, rate)
         WidgetState.setScaleType(this, appWidgetId, scale)
         WidgetState.setManualOnly(this, appWidgetId, manual)
         WidgetState.setZoomFactor(this, appWidgetId, zoom)
+        WidgetState.setZoomCenterX(this, appWidgetId, zoomCenterX)
+        WidgetState.setZoomCenterY(this, appWidgetId, zoomCenterY)
         WidgetState.setSkipNight(this, appWidgetId, skipNight)
         WidgetState.setSkipStart(this, appWidgetId, skipStart)
         WidgetState.setSkipEnd(this, appWidgetId, skipEnd)
@@ -123,13 +129,16 @@ class WidgetConfigActivity : ComponentActivity() {
 @Composable
 fun ConfigScreen(
     initialUrl: String, initialRate: Int, initialScale: String, initialManual: Boolean, initialZoom: Float, 
+    initialZoomCenterX: Float, initialZoomCenterY: Float,
     initialSkipNight: Boolean, initialSkipStart: String, initialSkipEnd: String,
-    onSave: (String, Int, String, Boolean, Float, Boolean, String, String) -> Unit
+    onSave: (String, Int, String, Boolean, Float, Float, Float, Boolean, String, String) -> Unit
 ) {
     var url by remember { mutableStateOf(initialUrl) }
-    var selectedRate by remember { mutableStateOf(initialRate) }
+    var selectedRate by remember { mutableIntStateOf(initialRate) }
     var selectedScale by remember { mutableStateOf(initialScale) }
-    var selectedZoom by remember { mutableStateOf(initialZoom) }
+    var selectedZoom by remember { mutableFloatStateOf(initialZoom) }
+    var zoomCenterX by remember { mutableFloatStateOf(initialZoomCenterX) }
+    var zoomCenterY by remember { mutableFloatStateOf(initialZoomCenterY) }
     var manualOnly by remember { mutableStateOf(initialManual) }
     var skipNight by remember { mutableStateOf(initialSkipNight) }
     var skipStart by remember { mutableStateOf(initialSkipStart) }
@@ -138,20 +147,20 @@ fun ConfigScreen(
     var rateExpanded by remember { mutableStateOf(false) }
     var scaleExpanded by remember { mutableStateOf(false) }
     var zoomExpanded by remember { mutableStateOf(false) }
-    
-    var showProfileSaveDialog by remember { mutableStateOf(false) }
+    val showProfileSaveDialog = remember { mutableStateOf(false) }
     var profileName by remember { mutableStateOf("") }
     
     val context = LocalContext.current
     var profiles by remember { mutableStateOf(WidgetState.getProfiles(context)) }
     var profilesExpanded by remember { mutableStateOf(false) }
+    var currentLoadedProfile by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
 
     val rates = listOf(15, 30, 60, 240, 480, 1440)
     val rateLabels = mapOf(15 to "15 Min", 30 to "30 Min", 60 to "1 Hour", 240 to "4 Hours", 480 to "8 Hours", 1440 to "24 Hours")
     val scales = listOf("Crop", "Fit", "Fill")
     val scaleLabels = mapOf("Crop" to "Crop to Fit", "Fit" to "Fit Content", "Fill" to "Stretch")
-    val zooms = listOf(1.0f, 1.25f, 1.5f, 2.0f)
+    val zooms = listOf(1.0f, 1.25f, 1.5f, 2.0f, 2.25f, 2.5f, 3.0f)
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -180,8 +189,10 @@ fun ConfigScreen(
                                     text = { Text(profile.name) },
                                     onClick = {
                                         url = profile.url; selectedRate = profile.rate; selectedScale = profile.scale
-                                        selectedZoom = profile.zoom; manualOnly = profile.manual; skipNight = profile.skipNight
+                                        selectedZoom = profile.zoom; zoomCenterX = profile.zoomCenterX; zoomCenterY = profile.zoomCenterY
+                                        manualOnly = profile.manual; skipNight = profile.skipNight
                                         skipStart = profile.skipStart; skipEnd = profile.skipEnd; profilesExpanded = false
+                                        currentLoadedProfile = profile.name
                                     }
                                 )
                             }
@@ -194,7 +205,7 @@ fun ConfigScreen(
 
             ExposedDropdownMenuBox(expanded = rateExpanded, onExpandedChange = { rateExpanded = !rateExpanded }) {
                 OutlinedTextField(value = rateLabels[selectedRate] ?: "$selectedRate Min", onValueChange = {}, readOnly = true, label = { Text("Refresh Rate") },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = rateExpanded) })
+                    modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = rateExpanded) })
                 ExposedDropdownMenu(expanded = rateExpanded, onDismissRequest = { rateExpanded = false }) {
                     rates.forEach { rate -> DropdownMenuItem(text = { Text(rateLabels[rate] ?: "$rate Min") }, onClick = { selectedRate = rate; rateExpanded = false }) }
                 }
@@ -202,7 +213,7 @@ fun ConfigScreen(
 
             ExposedDropdownMenuBox(expanded = scaleExpanded, onExpandedChange = { scaleExpanded = !scaleExpanded }) {
                 OutlinedTextField(value = scaleLabels[selectedScale] ?: selectedScale, onValueChange = {}, readOnly = true, label = { Text("Fitting") },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) })
+                    modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) })
                 ExposedDropdownMenu(expanded = scaleExpanded, onDismissRequest = { scaleExpanded = false }) {
                     scales.forEach { s -> DropdownMenuItem(text = { Text(scaleLabels[s] ?: s) }, onClick = { selectedScale = s; scaleExpanded = false }) }
                 }
@@ -210,9 +221,59 @@ fun ConfigScreen(
 
             ExposedDropdownMenuBox(expanded = zoomExpanded, onExpandedChange = { zoomExpanded = !zoomExpanded }) {
                 OutlinedTextField(value = "${selectedZoom}x", onValueChange = {}, readOnly = true, label = { Text("Zoom Factor") },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = zoomExpanded) })
+                    modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = zoomExpanded) })
                 ExposedDropdownMenu(expanded = zoomExpanded, onDismissRequest = { zoomExpanded = false }) {
                     zooms.forEach { z -> DropdownMenuItem(text = { Text("${z}x") }, onClick = { selectedZoom = z; zoomExpanded = false }) }
+                }
+            }
+            
+            if (selectedZoom > 1.0f) {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Zoom Focus Center", style = MaterialTheme.typography.labelLarge)
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("X:", style = MaterialTheme.typography.bodyMedium)
+                        Slider(
+                            value = zoomCenterX,
+                            onValueChange = { zoomCenterX = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                        BasicTextField(
+                            value = (zoomCenterX * 100).toInt().toString(),
+                            onValueChange = { newVal ->
+                                val parsed = newVal.toIntOrNull()
+                                if (parsed != null && (parsed in 0..100)) {
+                                    zoomCenterX = parsed / 100f
+                                }
+                            },
+                            modifier = Modifier.width(40.dp),
+                            singleLine = true,
+                            textStyle = LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
+                        )
+                        Text("%", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Y:", style = MaterialTheme.typography.bodyMedium)
+                        Slider(
+                            value = zoomCenterY,
+                            onValueChange = { zoomCenterY = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                        BasicTextField(
+                            value = (zoomCenterY * 100).toInt().toString(),
+                            onValueChange = { newVal ->
+                                val parsed = newVal.toIntOrNull()
+                                if (parsed != null && (parsed in 0..100)) {
+                                    zoomCenterY = parsed / 100f
+                                }
+                            },
+                            modifier = Modifier.width(40.dp),
+                            singleLine = true,
+                            textStyle = LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
+                        )
+                        Text("%", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
 
@@ -235,25 +296,70 @@ fun ConfigScreen(
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { showProfileSaveDialog = true }, modifier = Modifier.weight(1f)) { Text("Save Profile") }
-            Button(onClick = { onSave(url, selectedRate, selectedScale, manualOnly, selectedZoom, skipNight, skipStart, skipEnd) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
+            OutlinedButton(
+                onClick = { 
+                    profileName = currentLoadedProfile
+                    showProfileSaveDialog.value = true 
+                }, 
+                modifier = Modifier.weight(1f)
+            ) { Text("Save Profile") }
+            Button(onClick = { onSave(url, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
         }
     }
 
-    if (showProfileSaveDialog) {
+    if (showProfileSaveDialog.value) {
+        var profileDropdownExpanded by remember { mutableStateOf(false) }
+
         AlertDialog(
-            onDismissRequest = { showProfileSaveDialog = false }, 
+            onDismissRequest = { showProfileSaveDialog.value = false }, 
             title = { Text("Save Profile") },
-            text = { OutlinedTextField(value = profileName, onValueChange = { profileName = it }, label = { Text("Profile Name") }, singleLine = true) },
+            text = {
+                ExposedDropdownMenuBox(
+                    expanded = profileDropdownExpanded,
+                    onExpandedChange = { profileDropdownExpanded = !profileDropdownExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = profileName,
+                        onValueChange = { profileName = it },
+                        label = { Text("Profile Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryEditable, enabled = true),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = profileDropdownExpanded) }
+                    )
+                    if (profiles.isNotEmpty()) {
+                        ExposedDropdownMenu(
+                            expanded = profileDropdownExpanded,
+                            onDismissRequest = { profileDropdownExpanded = false }
+                        ) {
+                            profiles.forEach { p ->
+                                DropdownMenuItem(
+                                    text = { Text(p.name) },
+                                    onClick = {
+                                        profileName = p.name
+                                        profileDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     if (profileName.isNotBlank()) {
-                        WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, selectedRate, selectedScale, selectedZoom, manualOnly, skipNight, skipStart, skipEnd))
-                        profiles = WidgetState.getProfiles(context); showProfileSaveDialog = false; profileName = ""
+                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd))
+                        if (isSaved) {
+                            android.widget.Toast.makeText(context, "Profile '$profileName' saved successfully", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            android.widget.Toast.makeText(context, "Failed to save profile", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        profiles = WidgetState.getProfiles(context)
+                        currentLoadedProfile = profileName
+                        showProfileSaveDialog.value = false
                     }
                 }) { Text("Save") }
             },
-            dismissButton = { TextButton(onClick = { showProfileSaveDialog = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showProfileSaveDialog.value = false }) { Text("Cancel") } }
         )
     }
 }
@@ -265,5 +371,8 @@ fun TimeBox(label: String, time: String, modifier: Modifier = Modifier, onClick:
 }
 
 fun showTimePicker(context: Context, currentTime: String, onTimeSelected: (String) -> Unit) {
-    val parts = currentTime.split(":"); TimePickerDialog(context, { _, h, m -> onTimeSelected(String.format("%02d:%02d", h, m)) }, parts[0].toInt(), parts[1].toInt(), true).show()
+    val parts = currentTime.split(":")
+    TimePickerDialog(context, { _, h, m -> 
+        onTimeSelected(String.format(java.util.Locale.US, "%02d:%02d", h, m)) 
+    }, parts[0].toInt(), parts[1].toInt(), true).show()
 }

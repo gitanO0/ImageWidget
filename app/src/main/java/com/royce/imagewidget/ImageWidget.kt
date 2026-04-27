@@ -55,7 +55,7 @@ class ImageWidget : GlanceAppWidget() {
             
             // PRE-DECODE BITMAP ON BACKGROUND THREAD
             // Use 400x400 to stay safely under the 1MB IPC limit
-            val bitmap = if (imageFile.exists() && imageFile.length() > 0) {
+            val bitmap = if (imageFile.exists() && (imageFile.length() > 0)) {
                 val decoded = decodeSampledBitmapFromFile(imageFile.absolutePath, 400, 400)
                 val zoom = WidgetState.getZoomFactor(context, appWidgetId)
                 if (decoded != null && zoom > 1.0f) {
@@ -64,8 +64,13 @@ class ImageWidget : GlanceAppWidget() {
                         val h = decoded.height
                         val newW = (w / zoom).toInt()
                         val newH = (h / zoom).toInt()
-                        val x = (w - newW) / 2
-                        val y = (h - newH) / 2
+                        
+                        val centerX = WidgetState.getZoomCenterX(context, appWidgetId)
+                        val centerY = WidgetState.getZoomCenterY(context, appWidgetId)
+                        
+                        val x = ((w - newW) * centerX).toInt().coerceIn(0, w - newW)
+                        val y = ((h - newH) * centerY).toInt().coerceIn(0, h - newH)
+
                         val cropped = Bitmap.createBitmap(decoded, x, y, newW, newH)
                         if (cropped != decoded) decoded.recycle()
                         cropped
@@ -111,11 +116,11 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
                 contentScale = contentScale,
                 modifier = GlanceModifier
                     .fillMaxSize()
-                    .clickable(actionStartActivity<OpenImageActivity>(
-                        actionParametersOf(
-                            WidgetState.WidgetIdKey to appWidgetId
+                    .clickable(
+                        actionStartActivity<OpenImageActivity>(
+                            actionParametersOf(WidgetState.WidgetIdKey to appWidgetId)
                         )
-                    ))
+                    )
             )
         } else {
             Column(
@@ -157,7 +162,7 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
                     .background(ColorProvider(Color(0x66000000)))
                     .cornerRadius(8.dp)
                     .padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 val isProcessing = status != "OK" && !status.contains("Error") && !status.contains("Failed")
                 
@@ -194,6 +199,7 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
     }
 }
 
+@Suppress("SameParameterValue")
 private fun decodeSampledBitmapFromFile(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
     return try {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
