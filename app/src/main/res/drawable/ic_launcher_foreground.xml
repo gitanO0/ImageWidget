@@ -1,0 +1,80 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Crop / viewport corner marks -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M18,32 L18,20 L32,20" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M76,20 L90,20 L90,32" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M90,76 L90,88 L76,88" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M32,88 L18,88 L18,76" />
+
+    <!-- Outer lens body -->
+    <path
+        android:fillColor="#111827"
+        android:pathData="M54,13 A41,41 0,1 1,53.9,13 Z" />
+
+    <!-- Lens highlight ring -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,18 A36,36 0,1 1,53.9,18 Z" />
+
+    <!-- Inner image viewport -->
+    <path
+        android:fillColor="#60A5FA"
+        android:pathData="M54,23 A31,31 0,1 1,53.9,23 Z" />
+
+    <!-- Water band -->
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M24,66 C31,61 39,62 47,66 C56,70 66,70 84,64 L84,85 L24,85 Z" />
+
+    <!-- Back mountain -->
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M47,67 L66,45 C68,43 71,43 73,45 L91,67 Z" />
+
+    <!-- Front mountain -->
+    <path
+        android:fillColor="#1E293B"
+        android:pathData="M20,68 L37,49 C39,47 42,47 44,49 L62,68 Z" />
+
+    <!-- Sun -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,30 A7,7 0,1 1,35.9,30 Z" />
+
+    <!-- Subtle water highlight -->
+    <path
+        android:strokeColor="#93C5FD"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.7"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M40,73 L69,73" />
+</vector>
