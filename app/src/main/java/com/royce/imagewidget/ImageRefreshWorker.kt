@@ -39,17 +39,37 @@ class ImageRefreshWorker(
             val imageUrl = WidgetState.getUrl(applicationContext, widgetId)
             val cacheBustedUrl = "$imageUrl?t=${System.currentTimeMillis()}"
             
-            connection = withContext(Dispatchers.IO) {
-                URL(cacheBustedUrl).openConnection()
-            } as HttpURLConnection
-            connection.apply {
-                connectTimeout = 10000
-                readTimeout = 10000
-                connect()
+            var currentUrl = cacheBustedUrl
+            var redirectCount = 0
+            val maxRedirects = 3
+            
+            while (redirectCount < maxRedirects) {
+                connection = withContext(Dispatchers.IO) {
+                    URL(currentUrl).openConnection()
+                } as HttpURLConnection
+                connection.apply {
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
+                    connect()
+                }
+
+                if (connection.responseCode in 301..303 || connection.responseCode == 307 || connection.responseCode == 308) {
+                    val location = connection.getHeaderField("Location")
+                    if (location != null) {
+                        currentUrl = location
+                        redirectCount++
+                        connection.disconnect()
+                        continue
+                    }
+                }
+                break
             }
 
-            if (connection.responseCode !in 200..299) {
-                updateWidgetStatus(widgetId, "HTTP ${connection.responseCode}")
+            val finalConnection = connection!!
+            if (finalConnection.responseCode !in 200..299) {
+                updateWidgetStatus(widgetId, "HTTP ${finalConnection.responseCode}")
                 return Result.failure()
             }
 
@@ -59,7 +79,7 @@ class ImageRefreshWorker(
             val downloadTemp = File.createTempFile("down_$widgetId", ".tmp", applicationContext.filesDir)
             try {
                 downloadTemp.outputStream().use { output ->
-                    connection.inputStream.use { input -> input.copyTo(output) }
+                    finalConnection.inputStream.use { input -> input.copyTo(output) }
                 }
                 
                 // Only rename if download was non-zero
