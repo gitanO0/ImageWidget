@@ -156,7 +156,11 @@ fun ConfigScreen(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Widget Configuration", style = MaterialTheme.typography.headlineSmall)
+                Column {
+                    Text("Widget Configuration", style = MaterialTheme.typography.headlineSmall)
+                    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                    Text("v${packageInfo.versionName}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 
                 if (profiles.isNotEmpty()) {
                     Box {

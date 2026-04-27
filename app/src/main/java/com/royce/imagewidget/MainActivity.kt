@@ -1,16 +1,9 @@
 package com.royce.imagewidget
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.os.Bundle
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.core.content.edit
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.workDataOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,9 +23,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Fresh start logic: Clear all data if this is the first run of a new install/version
-        handleFreshStart()
-
         setContent {
             MaterialTheme {
                 Surface(
@@ -42,49 +32,6 @@ class MainActivity : ComponentActivity() {
                     AppScreen()
                 }
             }
-        }
-    }
-
-    private fun handleFreshStart() {
-        val prefs = getSharedPreferences("app_internal_state", MODE_PRIVATE)
-        val currentVersion = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                packageManager.getPackageInfo(packageName, 0).longVersionCode
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
-            }
-        } catch (_: Exception) { 1L }
-
-        val lastRunVersion = prefs.getLong("last_run_version", -1L)
-
-        if (lastRunVersion != currentVersion) {
-            // First run of a new install or update - clear everything
-            WidgetState.clearAll(this)
-            
-            // Trigger refresh for all existing widgets that might still be on the home screen
-            val appWidgetManager = AppWidgetManager.getInstance(this)
-            val ids = appWidgetManager.getAppWidgetIds(ComponentName(this, ImageWidgetReceiver::class.java))
-            
-            ids.forEach { id ->
-                WidgetState.setStatus(this, id, "Refreshing...")
-                val request = OneTimeWorkRequestBuilder<ImageRefreshWorker>()
-                    .setInitialDelay(5, java.util.concurrent.TimeUnit.SECONDS)
-                    .setInputData(workDataOf(
-                        ImageRefreshWorker.KEY_IS_MANUAL to true,
-                        ImageRefreshWorker.KEY_WIDGET_ID to id,
-                        "is_initial" to true
-                    ))
-                    .build()
-
-                WorkManager.getInstance(this).enqueueUniqueWork(
-                    "image_refresh_now_$id",
-                    ExistingWorkPolicy.REPLACE,
-                    request
-                )
-            }
-
-            prefs.edit { putLong("last_run_version", currentVersion) }
         }
     }
 }
