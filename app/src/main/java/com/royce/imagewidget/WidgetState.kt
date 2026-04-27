@@ -138,11 +138,6 @@ object WidgetState {
         }
     }
 
-    fun setStatus(context: Context, widgetId: Int, value: String) {
-        // Use commit() for status to ensure synchronous write before UI trigger
-        getPrefs(context).edit(commit = true) { putString(KEY_STATUS + widgetId, value) }
-    }
-
     fun setManualOnly(context: Context, widgetId: Int, value: Boolean) {
         getPrefs(context).edit { putBoolean(KEY_MANUAL_ONLY + widgetId, value) }
     }
@@ -207,16 +202,5 @@ object WidgetState {
         
         imageFile(context, widgetId).delete()
         File(context.applicationContext.filesDir, "latest_$widgetId.tmp").delete()
-    }
-
-    fun clearAll(context: Context) {
-        getPrefs(context).edit { clear() }
-        val filesDir = context.applicationContext.filesDir
-        filesDir.listFiles()?.forEach { file ->
-            val name = file.name
-            if (name.startsWith("latest_") && (name.endsWith(".png") || name.endsWith(".tmp"))) {
-                file.delete()
-            }
-        }
     }
 }

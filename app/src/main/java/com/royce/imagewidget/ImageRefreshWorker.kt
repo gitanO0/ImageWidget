@@ -13,6 +13,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.io.File
 import java.time.Instant
+import java.time.LocalTime
 
 class ImageRefreshWorker(
     appContext: Context,
@@ -28,6 +29,37 @@ class ImageRefreshWorker(
     override suspend fun doWork(): Result {
         val widgetId = inputData.getInt(KEY_WIDGET_ID, -1)
         if (widgetId == -1) return Result.success()
+
+        val isManual = inputData.getBoolean(KEY_IS_MANUAL, false)
+        
+        // Skip night logic
+        if (!isManual && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)) {
+            val skipNight = WidgetState.getSkipNight(applicationContext, widgetId)
+            if (skipNight) {
+                val startStr = WidgetState.getSkipStart(applicationContext, widgetId)
+                val endStr = WidgetState.getSkipEnd(applicationContext, widgetId)
+                try {
+                    val now = LocalTime.now()
+                    val start = LocalTime.parse(startStr)
+                    val end = LocalTime.parse(endStr)
+                    
+                    val isSkipping = if (start.isBefore(end)) {
+                        now.isAfter(start) && now.isBefore(end)
+                    } else {
+                        // Overlapping midnight (e.g., 22:00 to 06:00)
+                        now.isAfter(start) || now.isBefore(end)
+                    }
+                    
+                    if (isSkipping) {
+                        Log.d("ImageWorker", "Skipping update due to night mode ($startStr - $endStr)")
+                        updateWidgetStatus(widgetId, "Zzz (Night)")
+                        return Result.success()
+                    }
+                } catch (e: Exception) {
+                    Log.e("ImageWorker", "Error parsing skip times", e)
+                }
+            }
+        }
 
         var connection: HttpURLConnection? = null
         return try {
@@ -76,10 +108,14 @@ class ImageRefreshWorker(
             val tempFile = File(applicationContext.filesDir, "latest_$widgetId.tmp")
             
             // ATOMIC WRITE: Write to a unique temp file first
-            val downloadTemp = File.createTempFile("down_$widgetId", ".tmp", applicationContext.filesDir)
+            val downloadTemp = withContext(Dispatchers.IO) {
+                File.createTempFile("down_$widgetId", ".tmp", applicationContext.filesDir)
+            }
             try {
-                downloadTemp.outputStream().use { output ->
-                    finalConnection.inputStream.use { input -> input.copyTo(output) }
+                withContext(Dispatchers.IO) {
+                    downloadTemp.outputStream().use { output ->
+                        finalConnection.inputStream.use { input -> input.copyTo(output) }
+                    }
                 }
                 
                 // Only rename if download was non-zero
