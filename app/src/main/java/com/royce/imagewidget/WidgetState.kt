@@ -1,13 +1,15 @@
 package com.royce.imagewidget
 
 import android.content.Context
-import androidx.datastore.preferences.core.stringPreferencesKey
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.glance.action.ActionParameters
 import org.json.JSONObject
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.core.content.edit
 
 object WidgetState {
     private const val PREFS_NAME = "image_widget_prefs"
@@ -76,7 +78,7 @@ object WidgetState {
     }
 
     fun saveProfile(context: Context, profile: WidgetProfile) {
-        getProfilePrefs(context).edit().putString(profile.name, profile.toJson()).apply()
+        getProfilePrefs(context).edit { putString(profile.name, profile.toJson()) }
     }
 
     fun getProfiles(context: Context): List<WidgetProfile> {
@@ -92,16 +94,12 @@ object WidgetState {
         }.sortedBy { it.name }
     }
 
-    fun deleteProfile(context: Context, name: String) {
-        getProfilePrefs(context).edit().remove(name).apply()
-    }
-
     fun imageFile(context: Context, widgetId: Int): File {
         return File(context.applicationContext.filesDir, "latest_$widgetId.png")
     }
 
     fun setUrl(context: Context, widgetId: Int, url: String) {
-        getPrefs(context).edit().putString(KEY_URL + widgetId, url).apply()
+        getPrefs(context).edit { putString(KEY_URL + widgetId, url) }
     }
 
     fun getUrl(context: Context, widgetId: Int): String {
@@ -110,7 +108,7 @@ object WidgetState {
     }
 
     fun setRefreshRate(context: Context, widgetId: Int, minutes: Int) {
-        getPrefs(context).edit().putInt(KEY_REFRESH_RATE + widgetId, minutes).apply()
+        getPrefs(context).edit { putInt(KEY_REFRESH_RATE + widgetId, minutes) }
     }
 
     fun getRefreshRate(context: Context, widgetId: Int): Int {
@@ -118,13 +116,14 @@ object WidgetState {
     }
 
     fun setLastUpdated(context: Context, widgetId: Int, value: String) {
-        getPrefs(context).edit().putString(KEY_LAST_UPDATED + widgetId, value).apply()
+        getPrefs(context).edit { putString(KEY_LAST_UPDATED + widgetId, value) }
     }
 
     fun getLastUpdatedRaw(context: Context, widgetId: Int): String {
         return getPrefs(context).getString(KEY_LAST_UPDATED + widgetId, "Never") ?: "Never"
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     fun getLastUpdatedFormatted(context: Context, widgetId: Int): String {
         val raw = getLastUpdatedRaw(context, widgetId)
         if (raw == "Never") return raw
@@ -141,15 +140,11 @@ object WidgetState {
 
     fun setStatus(context: Context, widgetId: Int, value: String) {
         // Use commit() for status to ensure synchronous write before UI trigger
-        getPrefs(context).edit().putString(KEY_STATUS + widgetId, value).commit()
-    }
-
-    fun getStatus(context: Context, widgetId: Int): String {
-        return getPrefs(context).getString(KEY_STATUS + widgetId, "OK") ?: "OK"
+        getPrefs(context).edit(commit = true) { putString(KEY_STATUS + widgetId, value) }
     }
 
     fun setManualOnly(context: Context, widgetId: Int, value: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_MANUAL_ONLY + widgetId, value).apply()
+        getPrefs(context).edit { putBoolean(KEY_MANUAL_ONLY + widgetId, value) }
     }
 
     fun getManualOnly(context: Context, widgetId: Int): Boolean {
@@ -157,7 +152,7 @@ object WidgetState {
     }
 
     fun setScaleType(context: Context, widgetId: Int, value: String) {
-        getPrefs(context).edit().putString(KEY_SCALE_TYPE + widgetId, value).apply()
+        getPrefs(context).edit { putString(KEY_SCALE_TYPE + widgetId, value) }
     }
 
     fun getScaleType(context: Context, widgetId: Int): String {
@@ -165,7 +160,7 @@ object WidgetState {
     }
 
     fun setZoomFactor(context: Context, widgetId: Int, value: Float) {
-        getPrefs(context).edit().putFloat(KEY_ZOOM_FACTOR + widgetId, value).apply()
+        getPrefs(context).edit { putFloat(KEY_ZOOM_FACTOR + widgetId, value) }
     }
 
     fun getZoomFactor(context: Context, widgetId: Int): Float {
@@ -173,7 +168,7 @@ object WidgetState {
     }
 
     fun setSkipNight(context: Context, widgetId: Int, value: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_SKIP_NIGHT + widgetId, value).apply()
+        getPrefs(context).edit { putBoolean(KEY_SKIP_NIGHT + widgetId, value) }
     }
 
     fun getSkipNight(context: Context, widgetId: Int): Boolean {
@@ -181,7 +176,7 @@ object WidgetState {
     }
 
     fun setSkipStart(context: Context, widgetId: Int, value: String) {
-        getPrefs(context).edit().putString(KEY_SKIP_START + widgetId, value).apply()
+        getPrefs(context).edit { putString(KEY_SKIP_START + widgetId, value) }
     }
 
     fun getSkipStart(context: Context, widgetId: Int): String {
@@ -189,7 +184,7 @@ object WidgetState {
     }
 
     fun setSkipEnd(context: Context, widgetId: Int, value: String) {
-        getPrefs(context).edit().putString(KEY_SKIP_END + widgetId, value).apply()
+        getPrefs(context).edit { putString(KEY_SKIP_END + widgetId, value) }
     }
 
     fun getSkipEnd(context: Context, widgetId: Int): String {
@@ -197,25 +192,25 @@ object WidgetState {
     }
 
     fun clear(context: Context, widgetId: Int) {
-        getPrefs(context).edit()
-            .remove(KEY_URL + widgetId)
-            .remove(KEY_REFRESH_RATE + widgetId)
-            .remove(KEY_LAST_UPDATED + widgetId)
-            .remove(KEY_STATUS + widgetId)
-            .remove(KEY_MANUAL_ONLY + widgetId)
-            .remove(KEY_SCALE_TYPE + widgetId)
-            .remove(KEY_ZOOM_FACTOR + widgetId)
-            .remove(KEY_SKIP_NIGHT + widgetId)
-            .remove(KEY_SKIP_START + widgetId)
-            .remove(KEY_SKIP_END + widgetId)
-            .apply()
+        getPrefs(context).edit {
+            remove(KEY_URL + widgetId)
+                .remove(KEY_REFRESH_RATE + widgetId)
+                .remove(KEY_LAST_UPDATED + widgetId)
+                .remove(KEY_STATUS + widgetId)
+                .remove(KEY_MANUAL_ONLY + widgetId)
+                .remove(KEY_SCALE_TYPE + widgetId)
+                .remove(KEY_ZOOM_FACTOR + widgetId)
+                .remove(KEY_SKIP_NIGHT + widgetId)
+                .remove(KEY_SKIP_START + widgetId)
+                .remove(KEY_SKIP_END + widgetId)
+        }
         
         imageFile(context, widgetId).delete()
         File(context.applicationContext.filesDir, "latest_$widgetId.tmp").delete()
     }
 
     fun clearAll(context: Context) {
-        getPrefs(context).edit().clear().apply()
+        getPrefs(context).edit { clear() }
         val filesDir = context.applicationContext.filesDir
         filesDir.listFiles()?.forEach { file ->
             val name = file.name
