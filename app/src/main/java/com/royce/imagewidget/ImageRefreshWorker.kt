@@ -8,12 +8,22 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import java.io.File
 import java.time.Instant
 import java.time.LocalTime
+import java.util.concurrent.ConcurrentHashMap
+
+object WidgetMutexManager {
+    private val mutexes = ConcurrentHashMap<Int, Mutex>()
+    fun getMutex(widgetId: Int): Mutex {
+        return mutexes.getOrPut(widgetId) { Mutex() }
+    }
+}
 
 class ImageRefreshWorker(
     appContext: Context,
@@ -62,77 +72,82 @@ class ImageRefreshWorker(
         }
 
         var connection: HttpURLConnection? = null
-        return try {
-            // Log with Timestamp to see races
-            Log.d("ImageWorker", "[START] ID: $widgetId at ${System.currentTimeMillis()}")
-            
-            updateWidgetStatus(widgetId, "Downloading...")
-
-            val imageUrl = WidgetState.getUrl(applicationContext, widgetId)
-            val cacheBustedUrl = "$imageUrl?t=${System.currentTimeMillis()}"
-            
-            var currentUrl = cacheBustedUrl
-            var redirectCount = 0
-            val maxRedirects = 3
-            
-            while (redirectCount < maxRedirects) {
-                connection = withContext(Dispatchers.IO) {
-                    URL(currentUrl).openConnection()
-                } as HttpURLConnection
-                connection.apply {
-                    connectTimeout = 10000
-                    readTimeout = 10000
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
-                    connect()
-                }
-
-                if (connection.responseCode in 301..303 || connection.responseCode == 307 || connection.responseCode == 308) {
-                    val location = connection.getHeaderField("Location")
-                    if (location != null) {
-                        currentUrl = location
-                        redirectCount++
-                        connection.disconnect()
-                        continue
-                    }
-                }
-                break
-            }
-
-            val finalConnection = connection!!
-            if (finalConnection.responseCode !in 200..299) {
-                updateWidgetStatus(widgetId, "HTTP ${finalConnection.responseCode}")
-                return Result.failure()
-            }
-
-            val tempFile = File(applicationContext.filesDir, "latest_$widgetId.tmp")
-            
-            // ATOMIC WRITE: Write to a unique temp file first
-            val downloadTemp = withContext(Dispatchers.IO) {
-                File.createTempFile("down_$widgetId", ".tmp", applicationContext.filesDir)
-            }
+        val widgetMutex = WidgetMutexManager.getMutex(widgetId)
+        
+        return widgetMutex.withLock {
             try {
-                withContext(Dispatchers.IO) {
-                    downloadTemp.outputStream().use { output ->
-                        finalConnection.inputStream.use { input -> input.copyTo(output) }
+                // Log with Timestamp to see races
+                Log.d("ImageWorker", "[START] ID: $widgetId at ${System.currentTimeMillis()}")
+                
+                updateWidgetStatus(widgetId, "Downloading...")
+
+                val imageUrl = WidgetState.getUrl(applicationContext, widgetId)
+                val cacheBustedUrl = "$imageUrl?t=${System.currentTimeMillis()}"
+                
+                var currentUrl = cacheBustedUrl
+                var redirectCount = 0
+                val maxRedirects = 3
+                
+                val finalConnection = withContext(Dispatchers.IO) {
+                    var lastConn: HttpURLConnection? = null
+                    while (redirectCount < maxRedirects) {
+                        lastConn = URL(currentUrl).openConnection() as HttpURLConnection
+                        lastConn.apply {
+                            connectTimeout = 10000
+                            readTimeout = 10000
+                            instanceFollowRedirects = true
+                            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
+                            connect()
+                        }
+
+                        if (lastConn.responseCode in 301..303 || lastConn.responseCode == 307 || lastConn.responseCode == 308) {
+                            val location = lastConn.getHeaderField("Location")
+                            if (location != null) {
+                                currentUrl = location
+                                redirectCount++
+                                lastConn.disconnect()
+                                continue
+                            }
+                        }
+                        break
                     }
+                    lastConn
                 }
                 
-                // Only rename if download was non-zero
-                if (downloadTemp.length() > 0) {
-                    if (tempFile.exists()) tempFile.delete()
-                    if (downloadTemp.renameTo(tempFile)) {
-                        Log.d("ImageWorker", "Download atomic rename success")
-                    }
-                }
-            } finally {
-                if (downloadTemp.exists()) downloadTemp.delete()
-            }
+                connection = finalConnection
 
-            val finalFile = WidgetState.imageFile(applicationContext, widgetId)
-            
-            // Critical Section: Move temp to final
-            synchronized(this) {
+                if (finalConnection == null || finalConnection.responseCode !in 200..299) {
+                    updateWidgetStatus(widgetId, "HTTP ${finalConnection?.responseCode ?: "Error"}")
+                    return@withLock Result.failure()
+                }
+
+                val tempFile = File(applicationContext.filesDir, "latest_$widgetId.tmp")
+                
+                // ATOMIC WRITE: Write to a unique temp file first
+                val downloadTemp = withContext(Dispatchers.IO) {
+                    File.createTempFile("down_$widgetId", ".tmp", applicationContext.filesDir)
+                }
+                try {
+                    withContext(Dispatchers.IO) {
+                        downloadTemp.outputStream().use { output ->
+                            finalConnection.inputStream.use { input -> input.copyTo(output) }
+                        }
+                    }
+                    
+                    // Only rename if download was non-zero
+                    if (downloadTemp.length() > 0) {
+                        if (tempFile.exists()) tempFile.delete()
+                        if (downloadTemp.renameTo(tempFile)) {
+                            Log.d("ImageWorker", "Download atomic rename success")
+                        }
+                    }
+                } finally {
+                    if (downloadTemp.exists()) downloadTemp.delete()
+                }
+
+                val finalFile = WidgetState.imageFile(applicationContext, widgetId)
+                
+                // Critical Section: Move temp to final
                 if (tempFile.exists() && tempFile.length() > 0) {
                     if (finalFile.exists()) finalFile.delete()
                     if (tempFile.renameTo(finalFile)) {
@@ -141,25 +156,25 @@ class ImageRefreshWorker(
                         Log.e("ImageWorker", "Final rename FAILED")
                     }
                 }
-            }
-            
-            if (finalFile.exists() && finalFile.length() > 0) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    WidgetState.setLastUpdated(applicationContext, widgetId, Instant.now().toString())
+                
+                if (finalFile.exists() && finalFile.length() > 0) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        WidgetState.setLastUpdated(applicationContext, widgetId, Instant.now().toString())
+                    }
+                    updateWidgetStatus(widgetId, "OK")
+                    Log.d("ImageWorker", "[SUCCESS] ID: $widgetId")
+                    Result.success()
+                } else {
+                    updateWidgetStatus(widgetId, "Empty File")
+                    Result.failure()
                 }
-                updateWidgetStatus(widgetId, "OK")
-                Log.d("ImageWorker", "[SUCCESS] ID: $widgetId")
-                Result.success()
-            } else {
-                updateWidgetStatus(widgetId, "Empty File")
-                Result.failure()
+            } catch (e: Exception) {
+                Log.e("ImageWorker", "Error in worker: ${e.message}", e)
+                updateWidgetStatus(widgetId, "Failed")
+                Result.retry()
+            } finally {
+                connection?.disconnect()
             }
-        } catch (e: Exception) {
-            Log.e("ImageWorker", "Error in worker: ${e.message}", e)
-            updateWidgetStatus(widgetId, "Failed")
-            Result.retry()
-        } finally {
-            connection?.disconnect()
         }
     }
 
