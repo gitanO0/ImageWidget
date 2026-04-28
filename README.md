@@ -48,7 +48,13 @@ A flexible Android Home Screen widget built with **Jetpack Glance** that display
 
 ## Screenshots
 
-*(Add screenshots here)*
+<div align="center">
+  <img src="screenshots/homescreen_imageWidget.png" width="30%"  alt=""/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/config1.png" width="30%"  alt=""/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/config2.png" width="30%"  alt=""/>
+</div>
 
 ## License
 
