@@ -11,7 +11,7 @@ A flexible Android Home Screen widget built with **Jetpack Glance** that display
 - **Custom URLs**: Support for both HTTP and HTTPS image sources.
 - **Periodic Refresh**: Automatically update images at set intervals (15 min to 24 hours).
 - **Advanced Fitting**: Choose between "Crop to Fit", "Fit Content", and "Stretch" to display your image exactly how you want.
-- **Zoom Control**: Digital zoom support (1x to 2x) for focusing on specific parts of an image.
+- **Zoom Control**: Digital zoom support (1x to 3x) for focusing on specific parts of an image.
 - **Profiles & Management**: Save and load configuration presets for quick setup. **Import, Export, and Delete** profiles seamlessly.
 - **Skip Night Mode & Manual Override**: Pause updates during specific hours to save battery and data. You can still manually refresh the widget even when Night Mode is active.
 - **Material 3 UI & Dynamic Theming**: Clean, modern configuration interface that automatically adapts to your OS system theme (Dark/Light mode).
