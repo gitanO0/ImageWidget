@@ -1,5 +1,8 @@
 # ImageWidget
 
+[![Latest Release](https://img.shields.io/github/v/release/gitanO0/ImageWidget?label=Latest%20Release&color=success&style=for-the-badge)](https://github.com/gitanO0/ImageWidget/releases/latest)
+[![Download APK](https://img.shields.io/badge/Download-APK-blue?style=for-the-badge&logo=android)](https://github.com/gitanO0/ImageWidget/releases/latest)
+
 A flexible Android Home Screen widget built with **Jetpack Glance** that displays images from any URL. Perfect for monitoring weather maps, webcams, or just keeping your favorite photos on your home screen.
 
 ## Features
@@ -31,6 +34,13 @@ A flexible Android Home Screen widget built with **Jetpack Glance** that display
 
 ## Getting Started
 
+### Option 1: Quick Install (Recommended)
+1. Go to the **[Releases Page](https://github.com/gitanO0/ImageWidget/releases/latest)**.
+2. Under "Assets", click on the `ImageWidget-vX.X.apk` file to download it.
+3. Open the downloaded APK on your Android device to install.
+4. Go to your home screen, long-press, select Widgets, and find "ImageWidget".
+
+### Option 2: Build from Source
 1. Clone this repository.
 2. Open in **Android Studio Jellyfish** or newer.
 3. Build and run on your device.
