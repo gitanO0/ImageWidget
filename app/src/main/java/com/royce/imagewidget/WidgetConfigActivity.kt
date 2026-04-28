@@ -33,6 +33,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.royce.imagewidget.ui.theme.ImageWidgetTheme
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -57,8 +58,11 @@ class WidgetConfigActivity : ComponentActivity() {
         val currentSkipEnd = WidgetState.getSkipEnd(this, appWidgetId)
 
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+            ImageWidgetTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     ConfigScreen(
                         initialUrl = currentUrl,
                         initialRate = currentRate,
@@ -168,7 +172,7 @@ fun ConfigScreen(
                     out.write(json.toByteArray())
                 }
                 Toast.makeText(context, "Profiles exported", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Toast.makeText(context, "Failed to export profiles", Toast.LENGTH_SHORT).show()
             }
         }
@@ -181,7 +185,7 @@ fun ConfigScreen(
                 val count = WidgetState.importProfiles(context, jsonStr)
                 profiles = WidgetState.getProfiles(context)
                 Toast.makeText(context, "Imported $count profiles", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Toast.makeText(context, "Failed to import", Toast.LENGTH_SHORT).show()
             }
         }
@@ -404,9 +408,9 @@ fun ConfigScreen(
                     if (profileName.isNotBlank()) {
                         val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd))
                         if (isSaved) {
-                            android.widget.Toast.makeText(context, "Profile '$profileName' saved successfully", android.widget.Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Profile '$profileName' saved successfully", Toast.LENGTH_SHORT).show()
                         } else {
-                            android.widget.Toast.makeText(context, "Failed to save profile", android.widget.Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Failed to save profile", Toast.LENGTH_SHORT).show()
                         }
                         profiles = WidgetState.getProfiles(context)
                         currentLoadedProfile = profileName
