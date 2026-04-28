@@ -1,0 +1,59 @@
+name: Build and Release APK
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers automatically when a tag starting with 'v' is pushed (e.g., v1.0.0)
+  workflow_dispatch: # Allows you to manually trigger the build from the GitHub Actions tab
+
+jobs:
+  build:
+    name: Build APK and Create Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # Needed to create GitHub Releases
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        # We use assembleDebug here for simplicity. 
+        # assembleRelease requires signing setup (keystore) to produce an installable signed APK.
+        run: ./gradlew assembleDebug
+
+      - name: Extract Version Name from Gradle
+        run: |
+          # Use grep to find versionName = "X.X" and extract just the number
+          VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          echo "Extracted version: $VERSION_NAME"
+          # Save it to GitHub Action environment variables so later steps can use it
+          echo "APP_VERSION=$VERSION_NAME" >> $GITHUB_ENV
+
+      - name: Rename APK
+        run: mv app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/debug/ImageWidget-v${{ env.APP_VERSION }}.apk"
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImageWidget-v${{ env.APP_VERSION }}
+          path: app/build/outputs/apk/debug/ImageWidget-v${{ env.APP_VERSION }}.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          name: Release v${{ env.APP_VERSION }}
+          files: "app/build/outputs/apk/debug/ImageWidget-v${{ env.APP_VERSION }}.apk"
+          generate_release_notes: true
