@@ -41,35 +41,12 @@ class ImageRefreshWorker(
         
         // Skip night logic
         if (!isManual) {
-            val skipNight = WidgetState.getSkipNight(applicationContext, widgetId)
-            if (skipNight) {
+            if (isNightModeActive(applicationContext, widgetId)) {
                 val startStr = WidgetState.getSkipStart(applicationContext, widgetId)
                 val endStr = WidgetState.getSkipEnd(applicationContext, widgetId)
-                try {
-                    val calNow = java.util.Calendar.getInstance()
-                    val nowMinutes = calNow.get(java.util.Calendar.HOUR_OF_DAY) * 60 + calNow.get(java.util.Calendar.MINUTE)
-                    
-                    val startParts = startStr.split(":")
-                    val startMinutes = startParts[0].toInt() * 60 + startParts[1].toInt()
-                    
-                    val endParts = endStr.split(":")
-                    val endMinutes = endParts[0].toInt() * 60 + endParts[1].toInt()
-                    
-                    val isSkipping = if (startMinutes < endMinutes) {
-                        nowMinutes in startMinutes..endMinutes
-                    } else {
-                        // Overlapping midnight (e.g., 22:00 to 06:00)
-                        nowMinutes >= startMinutes || nowMinutes <= endMinutes
-                    }
-                    
-                    if (isSkipping) {
-                        Log.d("ImageWorker", "Skipping update due to night mode ($startStr - $endStr)")
-                        updateWidgetStatus(widgetId, "Zzz (Night)")
-                        return Result.success()
-                    }
-                } catch (e: Exception) {
-                    Log.e("ImageWorker", "Error parsing skip times", e)
-                }
+                Log.d("ImageWorker", "Skipping update due to night mode ($startStr - $endStr)")
+                updateWidgetStatus(widgetId, "Zzz (Night)")
+                return Result.success()
             }
         }
 
@@ -161,7 +138,8 @@ class ImageRefreshWorker(
                 
                 if (finalFile.exists() && finalFile.length() > 0) {
                     WidgetState.setLastUpdated(applicationContext, widgetId, System.currentTimeMillis().toString())
-                    updateWidgetStatus(widgetId, "OK")
+                    val isNight = isNightModeActive(applicationContext, widgetId)
+                    updateWidgetStatus(widgetId, if (isNight) "Zzz (Night)" else "OK")
                     Log.d("ImageWorker", "[SUCCESS] ID: $widgetId")
                     Result.success()
                 } else {
@@ -191,5 +169,32 @@ class ImageRefreshWorker(
         } catch (e: Exception) {
             Log.e("ImageWorker", "Status update failed", e)
         }
+    }
+
+    private fun isNightModeActive(context: Context, widgetId: Int): Boolean {
+        val skipNight = WidgetState.getSkipNight(context, widgetId)
+        if (!skipNight) return false
+
+        val startStr = WidgetState.getSkipStart(context, widgetId)
+        val endStr = WidgetState.getSkipEnd(context, widgetId)
+        try {
+            val calNow = java.util.Calendar.getInstance()
+            val nowMinutes = calNow.get(java.util.Calendar.HOUR_OF_DAY) * 60 + calNow.get(java.util.Calendar.MINUTE)
+            
+            val startParts = startStr.split(":")
+            val startMinutes = startParts[0].toInt() * 60 + startParts[1].toInt()
+            
+            val endParts = endStr.split(":")
+            val endMinutes = endParts[0].toInt() * 60 + endParts[1].toInt()
+            
+            return if (startMinutes < endMinutes) {
+                nowMinutes in startMinutes..endMinutes
+            } else {
+                nowMinutes >= startMinutes || nowMinutes <= endMinutes
+            }
+        } catch (e: Exception) {
+            Log.e("ImageWorker", "Error parsing skip times", e)
+        }
+        return false
     }
 }
