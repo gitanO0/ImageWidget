@@ -89,6 +89,11 @@ object WidgetState {
         return getProfilePrefs(context).edit().putString(profile.name, profile.toJson()).commit()
     }
 
+    @android.annotation.SuppressLint("ApplySharedPref")
+    fun deleteProfile(context: Context, name: String): Boolean {
+        return getProfilePrefs(context).edit().remove(name).commit()
+    }
+
     fun getProfiles(context: Context): List<WidgetProfile> {
         val prefs = getProfilePrefs(context)
         return prefs.all.asSequence().mapNotNull { (name, json) ->
@@ -100,6 +105,37 @@ object WidgetState {
                 }
             } else null
         }.toList().sortedBy { it.name }
+    }
+
+    fun exportProfiles(context: Context): String {
+        val profiles = getProfiles(context)
+        val exportJson = JSONObject()
+        profiles.forEach { profile ->
+            exportJson.put(profile.name, JSONObject(profile.toJson()))
+        }
+        return exportJson.toString(2)
+    }
+
+    fun importProfiles(context: Context, jsonString: String): Int {
+        var count = 0
+        try {
+            val prefs = getProfilePrefs(context)
+            val root = JSONObject(jsonString)
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val name = keys.next()
+                if (!prefs.contains(name)) {
+                    val profileJson = root.getJSONObject(name)
+                    val profile = WidgetProfile.fromJson(name, profileJson.toString())
+                    if (saveProfile(context, profile)) {
+                        count++
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return count
     }
 
     fun imageFile(context: Context, widgetId: Int): File {

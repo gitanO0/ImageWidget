@@ -14,12 +14,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.lifecycle.lifecycleScope
@@ -156,6 +160,33 @@ fun ConfigScreen(
     var currentLoadedProfile by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
 
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let {
+            try {
+                val json = WidgetState.exportProfiles(context)
+                context.contentResolver.openOutputStream(it)?.use { out ->
+                    out.write(json.toByteArray())
+                }
+                Toast.makeText(context, "Profiles exported", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to export profiles", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let {
+            try {
+                val jsonStr = context.contentResolver.openInputStream(it)?.bufferedReader().use { reader -> reader?.readText() } ?: ""
+                val count = WidgetState.importProfiles(context, jsonStr)
+                profiles = WidgetState.getProfiles(context)
+                Toast.makeText(context, "Imported $count profiles", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to import", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     val rates = listOf(15, 30, 60, 240, 480, 1440)
     val rateLabels = mapOf(15 to "15 Min", 30 to "30 Min", 60 to "1 Hour", 240 to "4 Hours", 480 to "8 Hours", 1440 to "24 Hours")
     val scales = listOf("Crop", "Fit", "Fill")
@@ -171,22 +202,31 @@ fun ConfigScreen(
                     Text("v${packageInfo.versionName}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
-                if (profiles.isNotEmpty()) {
-                    Box {
-                        IconButton(
-                            onClick = { profilesExpanded = true },
-                            modifier = Modifier.size(64.dp) // Increased from default
-                        ) {
-                            Icon(
-                                Icons.Default.ArrowDropDown, 
-                                "Profiles",
-                                modifier = Modifier.size(48.dp) // 2x bigger than typical 24dp
-                            )
-                        }
-                        DropdownMenu(expanded = profilesExpanded, onDismissRequest = { profilesExpanded = false }) {
+                Box {
+                    IconButton(
+                        onClick = { profilesExpanded = true },
+                        modifier = Modifier.size(64.dp) // Increased from default
+                    ) {
+                        Icon(
+                            Icons.Default.ArrowDropDown, 
+                            "Profiles",
+                            modifier = Modifier.size(48.dp) // 2x bigger than typical 24dp
+                        )
+                    }
+                    DropdownMenu(expanded = profilesExpanded, onDismissRequest = { profilesExpanded = false }) {
+                        if (profiles.isNotEmpty()) {
                             profiles.forEach { profile ->
                                 DropdownMenuItem(
                                     text = { Text(profile.name) },
+                                    trailingIcon = {
+                                        IconButton(onClick = {
+                                            WidgetState.deleteProfile(context, profile.name)
+                                            profiles = WidgetState.getProfiles(context)
+                                            if (currentLoadedProfile == profile.name) currentLoadedProfile = ""
+                                        }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete Profile")
+                                        }
+                                    },
                                     onClick = {
                                         url = profile.url; selectedRate = profile.rate; selectedScale = profile.scale
                                         selectedZoom = profile.zoom; zoomCenterX = profile.zoomCenterX; zoomCenterY = profile.zoomCenterY
@@ -196,7 +236,22 @@ fun ConfigScreen(
                                     }
                                 )
                             }
+                            HorizontalDivider()
                         }
+                        DropdownMenuItem(
+                            text = { Text("Import Profiles") },
+                            onClick = { 
+                                profilesExpanded = false
+                                importLauncher.launch(arrayOf("application/json", "*/*"))
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Export Profiles") },
+                            onClick = { 
+                                profilesExpanded = false
+                                exportLauncher.launch("imagewidget_profiles.json")
+                            }
+                        )
                     }
                 }
             }
