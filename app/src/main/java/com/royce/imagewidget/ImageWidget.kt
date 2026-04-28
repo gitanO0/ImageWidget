@@ -165,10 +165,11 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
                     .padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val isProcessing = status != "OK" && !status.contains("Error") && !status.contains("Failed")
+                val isZzz = status.contains("Zzz")
+                val isProcessing = status != "OK" && !status.contains("Error") && !status.contains("Failed") && !isZzz
                 
                 Text(
-                    text = if (isProcessing) status else "Refresh",
+                    text = if (isProcessing || isZzz) status else "Refresh",
                     style = TextStyle(
                         color = if (isProcessing) ColorProvider(Color.LightGray) else ColorProvider(Color.White),
                         fontWeight = FontWeight.Bold
