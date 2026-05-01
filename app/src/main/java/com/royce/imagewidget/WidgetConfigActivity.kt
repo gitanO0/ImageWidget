@@ -47,6 +47,7 @@ class WidgetConfigActivity : ComponentActivity() {
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) { finish(); return }
 
         val currentUrl = WidgetState.getUrl(this, appWidgetId)
+        val currentClickUrl = WidgetState.getClickUrl(this, appWidgetId)
         val currentRate = WidgetState.getRefreshRate(this, appWidgetId)
         val currentScale = WidgetState.getScaleType(this, appWidgetId)
         val currentManual = WidgetState.getManualOnly(this, appWidgetId)
@@ -65,6 +66,7 @@ class WidgetConfigActivity : ComponentActivity() {
                 ) {
                     ConfigScreen(
                         initialUrl = currentUrl,
+                        initialClickUrl = currentClickUrl,
                         initialRate = currentRate,
                         initialScale = currentScale,
                         initialManual = currentManual,
@@ -74,16 +76,17 @@ class WidgetConfigActivity : ComponentActivity() {
                         initialSkipNight = currentSkipNight,
                         initialSkipStart = currentSkipStart,
                         initialSkipEnd = currentSkipEnd,
-                    ) { url, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end -> 
-                        saveConfig(url, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end) 
+                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end -> 
+                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end) 
                     }
                 }
             }
         }
     }
 
-    private fun saveConfig(url: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String) {
+    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String) {
         WidgetState.setUrl(this, appWidgetId, url)
+        WidgetState.setClickUrl(this, appWidgetId, clickUrl)
         WidgetState.setRefreshRate(this, appWidgetId, rate)
         WidgetState.setScaleType(this, appWidgetId, scale)
         WidgetState.setManualOnly(this, appWidgetId, manual)
@@ -136,12 +139,13 @@ class WidgetConfigActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConfigScreen(
-    initialUrl: String, initialRate: Int, initialScale: String, initialManual: Boolean, initialZoom: Float, 
+    initialUrl: String, initialClickUrl: String, initialRate: Int, initialScale: String, initialManual: Boolean, initialZoom: Float, 
     initialZoomCenterX: Float, initialZoomCenterY: Float,
     initialSkipNight: Boolean, initialSkipStart: String, initialSkipEnd: String,
-    onSave: (String, Int, String, Boolean, Float, Float, Float, Boolean, String, String) -> Unit
+    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String) -> Unit
 ) {
     var url by remember { mutableStateOf(initialUrl) }
+    var clickUrl by remember { mutableStateOf(initialClickUrl) }
     var selectedRate by remember { mutableIntStateOf(initialRate) }
     var selectedScale by remember { mutableStateOf(initialScale) }
     var selectedZoom by remember { mutableFloatStateOf(initialZoom) }
@@ -232,7 +236,7 @@ fun ConfigScreen(
                                         }
                                     },
                                     onClick = {
-                                        url = profile.url; selectedRate = profile.rate; selectedScale = profile.scale
+                                        url = profile.url; clickUrl = profile.clickUrl; selectedRate = profile.rate; selectedScale = profile.scale
                                         selectedZoom = profile.zoom; zoomCenterX = profile.zoomCenterX; zoomCenterY = profile.zoomCenterY
                                         manualOnly = profile.manual; skipNight = profile.skipNight
                                         skipStart = profile.skipStart; skipEnd = profile.skipEnd; profilesExpanded = false
@@ -261,6 +265,14 @@ fun ConfigScreen(
             }
 
             OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("Image URL") }, modifier = Modifier.fillMaxWidth())
+            
+            OutlinedTextField(
+                value = clickUrl, 
+                onValueChange = { clickUrl = it }, 
+                label = { Text("On-Click URL (Optional)") }, 
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Leave blank to open Image URL") }
+            )
 
             ExposedDropdownMenuBox(expanded = rateExpanded, onExpandedChange = { rateExpanded = !rateExpanded }) {
                 OutlinedTextField(value = rateLabels[selectedRate] ?: "$selectedRate Min", onValueChange = {}, readOnly = true, label = { Text("Refresh Rate") },
@@ -362,7 +374,7 @@ fun ConfigScreen(
                 }, 
                 modifier = Modifier.weight(1f)
             ) { Text("Save Profile") }
-            Button(onClick = { onSave(url, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
+            Button(onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
         }
     }
 
@@ -406,7 +418,7 @@ fun ConfigScreen(
             confirmButton = {
                 TextButton(onClick = {
                     if (profileName.isNotBlank()) {
-                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd))
+                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd))
                         if (isSaved) {
                             Toast.makeText(context, "Profile '$profileName' saved successfully", Toast.LENGTH_SHORT).show()
                         } else {

@@ -38,6 +38,12 @@ class ImageRefreshWorker(
         if (widgetId == -1) return Result.success()
 
         val isManual = inputData.getBoolean(KEY_IS_MANUAL, false)
+
+        if (!NetworkUtils.isNetworkAvailable(applicationContext)) {
+            Log.d("ImageWorker", "Skipping update due to no internet connection")
+            updateWidgetStatus(widgetId, "No Internet")
+            return Result.failure()
+        }
         
         // Skip night logic
         if (!isManual) {

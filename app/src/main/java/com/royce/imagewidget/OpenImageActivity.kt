@@ -15,15 +15,28 @@ class OpenImageActivity : ComponentActivity() {
         val widgetId = intent.getIntExtra("app_widget_id", 
             intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID))
         
-        val imageUrl = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            WidgetState.getUrl(this, widgetId)
+        val customClickUrl = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            WidgetState.getClickUrl(this, widgetId)
+        } else ""
+
+        var finalUrl = if (customClickUrl.isNotBlank()) {
+            customClickUrl
         } else {
-            ImageRefreshWorker.IMAGE_URL
+            val imageUrl = if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                WidgetState.getUrl(this, widgetId)
+            } else {
+                ImageRefreshWorker.IMAGE_URL
+            }
+            "$imageUrl?t=${System.currentTimeMillis()}"
+        }
+
+        if (!finalUrl.startsWith("http://", ignoreCase = true) && !finalUrl.startsWith("https://", ignoreCase = true)) {
+            finalUrl = "http://$finalUrl"
         }
 
         val browserIntent = Intent(
             Intent.ACTION_VIEW,
-            "$imageUrl?t=${System.currentTimeMillis()}".toUri()
+            finalUrl.toUri()
         )
         startActivity(browserIntent)
         finish()

@@ -14,6 +14,7 @@ object WidgetState {
     private const val PREFS_NAME = "image_widget_prefs"
 
     private const val KEY_URL = "url_"
+    private const val KEY_CLICK_URL = "click_url_"
     private const val KEY_REFRESH_RATE = "refresh_rate_"
     private const val KEY_LAST_UPDATED = "last_updated_"
     private const val KEY_STATUS = "status_"
@@ -39,6 +40,7 @@ object WidgetState {
     data class WidgetProfile(
         val name: String,
         val url: String,
+        val clickUrl: String = "",
         val rate: Int,
         val scale: String,
         val zoom: Float,
@@ -52,6 +54,7 @@ object WidgetState {
         fun toJson(): String {
             val json = JSONObject()
             json.put("url", url)
+            json.put("clickUrl", clickUrl)
             json.put("rate", rate)
             json.put("scale", scale)
             json.put("zoom", zoom.toDouble())
@@ -70,6 +73,7 @@ object WidgetState {
                 return WidgetProfile(
                     name = name,
                     url = json.getString("url"),
+                    clickUrl = json.optString("clickUrl", ""),
                     rate = json.getInt("rate"),
                     scale = json.getString("scale"),
                     zoom = json.getDouble("zoom").toFloat(),
@@ -149,6 +153,14 @@ object WidgetState {
     fun getUrl(context: Context, widgetId: Int): String {
         return getPrefs(context).getString(KEY_URL + widgetId, ImageRefreshWorker.IMAGE_URL) 
             ?: ImageRefreshWorker.IMAGE_URL
+    }
+
+    fun setClickUrl(context: Context, widgetId: Int, clickUrl: String) {
+        getPrefs(context).edit { putString(KEY_CLICK_URL + widgetId, clickUrl) }
+    }
+
+    fun getClickUrl(context: Context, widgetId: Int): String {
+        return getPrefs(context).getString(KEY_CLICK_URL + widgetId, "") ?: ""
     }
 
     fun setRefreshRate(context: Context, widgetId: Int, minutes: Int) {
@@ -259,6 +271,7 @@ object WidgetState {
     fun clear(context: Context, widgetId: Int) {
         getPrefs(context).edit {
             remove(KEY_URL + widgetId)
+                .remove(KEY_CLICK_URL + widgetId)
                 .remove(KEY_REFRESH_RATE + widgetId)
                 .remove(KEY_LAST_UPDATED + widgetId)
                 .remove(KEY_STATUS + widgetId)
