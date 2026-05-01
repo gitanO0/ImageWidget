@@ -106,7 +106,12 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(Color.Black)),
+            .background(ColorProvider(Color.Black))
+            .clickable(
+                actionStartActivity<OpenImageActivity>(
+                    actionParametersOf(WidgetState.WidgetIdKey to appWidgetId)
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         // 1. The Image (Background)
@@ -117,11 +122,6 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
                 contentScale = contentScale,
                 modifier = GlanceModifier
                     .fillMaxSize()
-                    .clickable(
-                        actionStartActivity<OpenImageActivity>(
-                            actionParametersOf(WidgetState.WidgetIdKey to appWidgetId)
-                        )
-                    )
             )
         } else {
             Column(
