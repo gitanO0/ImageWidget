@@ -94,6 +94,7 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
     val lastUpdated = WidgetState.getLastUpdatedFormatted(context, appWidgetId)
     val manualOnly = WidgetState.getManualOnly(context, appWidgetId)
     val scaleType = WidgetState.getScaleType(context, appWidgetId)
+    val nextDiscreteTime = WidgetState.getNextDiscreteTime(context, appWidgetId)
     
     Log.d("ImageWidget", "[RENDER] ID: $appWidgetId, Status: $status, HasBitmap: ${bitmap != null}")
 
@@ -191,6 +192,18 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
                         fontWeight = FontWeight.Bold
                     )
                 )
+
+                if (nextDiscreteTime != null) {
+                    Spacer(modifier = GlanceModifier.width(8.dp))
+                    Text(
+                        text = "⏳ $nextDiscreteTime",
+                        style = TextStyle(
+                            color = ColorProvider(Color.Yellow), 
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
 
                 if (manualOnly) {
                     Spacer(modifier = GlanceModifier.width(8.dp))
