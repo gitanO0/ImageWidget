@@ -426,23 +426,6 @@ fun ConfigScreen(
                 }
             }
 
-            Row(modifier = Modifier.fillMaxWidth().clickable { manualOnly = !manualOnly }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text("Manual Only"); Text("No background updates", style = MaterialTheme.typography.bodySmall) }
-                Switch(checked = manualOnly, onCheckedChange = { manualOnly = it })
-            }
-
-            Row(modifier = Modifier.fillMaxWidth().clickable { skipNight = !skipNight }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text("Skip Night"); Text("Pause during hours", style = MaterialTheme.typography.bodySmall) }
-                Switch(checked = skipNight, onCheckedChange = { skipNight = it })
-            }
-
-            if (skipNight) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    TimeBox(label = "Start", time = skipStart, modifier = Modifier.weight(1f), onClick = { showTimePicker(context, skipStart) { skipStart = it } })
-                    TimeBox(label = "End", time = skipEnd, modifier = Modifier.weight(1f), onClick = { showTimePicker(context, skipEnd) { skipEnd = it } })
-                }
-            }
-
             HorizontalDivider()
             
             Column {
