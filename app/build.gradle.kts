@@ -10,8 +10,8 @@ android {
     defaultConfig {
         applicationId = "com.royce.imagewidget"
         minSdk = 24
-        versionCode = 6
-        versionName = "1.28"
+        versionCode = 7
+        versionName = "1.29"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

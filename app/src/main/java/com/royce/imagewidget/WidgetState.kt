@@ -280,6 +280,43 @@ object WidgetState {
         return getPrefs(context).getString(KEY_DISCRETE_TIMES + widgetId, "") ?: ""
     }
 
+    fun getNextDiscreteTime(context: Context, widgetId: Int): String? {
+        val timesString = getDiscreteTimes(context, widgetId)
+        if (timesString.isBlank()) return null
+        
+        val times = timesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (times.isEmpty()) return null
+
+        val now = java.util.Calendar.getInstance()
+        var nextTimeStr: String? = null
+        var minDelay = Long.MAX_VALUE
+
+        for (time in times) {
+            val parts = time.split(":")
+            if (parts.size != 2) continue
+            val hour = parts[0].toIntOrNull() ?: continue
+            val minute = parts[1].toIntOrNull() ?: continue
+
+            val targetTime = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, hour)
+                set(java.util.Calendar.MINUTE, minute)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+
+            if (targetTime.before(now) || targetTime.timeInMillis == now.timeInMillis) {
+                targetTime.add(java.util.Calendar.DAY_OF_YEAR, 1)
+            }
+
+            val delay = targetTime.timeInMillis - now.timeInMillis
+            if (delay < minDelay) {
+                minDelay = delay
+                nextTimeStr = time
+            }
+        }
+        return nextTimeStr
+    }
+
     fun clear(context: Context, widgetId: Int) {
         getPrefs(context).edit {
             remove(KEY_URL + widgetId)
