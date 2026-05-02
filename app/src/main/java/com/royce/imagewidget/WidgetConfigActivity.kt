@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.InputChip
@@ -155,12 +156,13 @@ fun ConfigScreen(
 ) {
     var url by remember { mutableStateOf(initialUrl) }
     var clickUrl by remember { mutableStateOf(initialClickUrl) }
-    var selectedRate by remember { mutableIntStateOf(initialRate) }
+    var manualOnly by remember { mutableStateOf(initialManual) }
+    var previousRate by remember { mutableIntStateOf(if (initialRate > 0) initialRate else 15) }
+    var selectedRate by remember { mutableIntStateOf(if (initialManual) -1 else initialRate) }
     var selectedScale by remember { mutableStateOf(initialScale) }
     var selectedZoom by remember { mutableFloatStateOf(initialZoom) }
     var zoomCenterX by remember { mutableFloatStateOf(initialZoomCenterX) }
     var zoomCenterY by remember { mutableFloatStateOf(initialZoomCenterY) }
-    var manualOnly by remember { mutableStateOf(initialManual) }
     var skipNight by remember { mutableStateOf(initialSkipNight) }
     var skipStart by remember { mutableStateOf(initialSkipStart) }
     var skipEnd by remember { mutableStateOf(initialSkipEnd) }
@@ -205,8 +207,8 @@ fun ConfigScreen(
         }
     }
 
-    val rates = listOf(15, 30, 60, 240, 480, 1440)
-    val rateLabels = mapOf(15 to "15 Min", 30 to "30 Min", 60 to "1 Hour", 240 to "4 Hours", 480 to "8 Hours", 1440 to "24 Hours")
+    val rates = listOf(-1, 15, 30, 60, 240, 480, 1440)
+    val rateLabels = mapOf(-1 to "None", 15 to "15 Min", 30 to "30 Min", 60 to "1 Hour", 240 to "4 Hours", 480 to "8 Hours", 1440 to "24 Hours")
     val scales = listOf("Crop", "Fit", "Fill")
     val scaleLabels = mapOf("Crop" to "Crop to Fit", "Fit" to "Fit Content", "Fill" to "Stretch")
     val zooms = listOf(1.0f, 1.25f, 1.5f, 2.0f, 2.25f, 2.5f, 3.0f)
@@ -246,9 +248,18 @@ fun ConfigScreen(
                                         }
                                     },
                                     onClick = {
-                                        url = profile.url; clickUrl = profile.clickUrl; selectedRate = profile.rate; selectedScale = profile.scale
+                                        url = profile.url; clickUrl = profile.clickUrl
+                                        manualOnly = profile.manual
+                                        if (profile.manual) {
+                                            if (profile.rate > 0) previousRate = profile.rate
+                                            selectedRate = -1
+                                        } else {
+                                            selectedRate = profile.rate
+                                            previousRate = profile.rate
+                                        }
+                                        selectedScale = profile.scale
                                         selectedZoom = profile.zoom; zoomCenterX = profile.zoomCenterX; zoomCenterY = profile.zoomCenterY
-                                        manualOnly = profile.manual; skipNight = profile.skipNight
+                                        skipNight = profile.skipNight
                                         skipStart = profile.skipStart; skipEnd = profile.skipEnd
                                         discreteTimes = profile.discreteTimes.split(",").filter { it.isNotBlank() }
                                         profilesExpanded = false
@@ -286,11 +297,110 @@ fun ConfigScreen(
                 placeholder = { Text("Leave blank to open Image URL") }
             )
 
-            ExposedDropdownMenuBox(expanded = rateExpanded, onExpandedChange = { rateExpanded = !rateExpanded }) {
-                OutlinedTextField(value = rateLabels[selectedRate] ?: "$selectedRate Min", onValueChange = {}, readOnly = true, label = { Text("Refresh Rate") },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = rateExpanded) })
-                ExposedDropdownMenu(expanded = rateExpanded, onDismissRequest = { rateExpanded = false }) {
-                    rates.forEach { rate -> DropdownMenuItem(text = { Text(rateLabels[rate] ?: "$rate Min") }, onClick = { selectedRate = rate; rateExpanded = false }) }
+            ExposedDropdownMenuBox(expanded = rateExpanded && !manualOnly, onExpandedChange = { if (!manualOnly) rateExpanded = !rateExpanded }) {
+                OutlinedTextField(
+                    value = rateLabels[selectedRate] ?: "$selectedRate Min", 
+                    onValueChange = {}, 
+                    readOnly = true, 
+                    label = { Text("Auto Refresh Rate") },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = !manualOnly), 
+                    enabled = !manualOnly,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = rateExpanded && !manualOnly) }
+                )
+                ExposedDropdownMenu(expanded = rateExpanded && !manualOnly, onDismissRequest = { rateExpanded = false }) {
+                    rates.forEach { rate -> 
+                        DropdownMenuItem(
+                            text = { Text(rateLabels[rate] ?: "$rate Min") }, 
+                            onClick = { 
+                                selectedRate = rate
+                                if (rate == -1) {
+                                    manualOnly = true
+                                } else {
+                                    manualOnly = false
+                                    previousRate = rate
+                                }
+                                rateExpanded = false 
+                            }
+                        ) 
+                    }
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth().clickable { 
+                manualOnly = !manualOnly
+                if (manualOnly) {
+                    if (selectedRate > 0) previousRate = selectedRate
+                    selectedRate = -1
+                } else {
+                    selectedRate = previousRate
+                }
+            }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column { Text("Manual Refresh Only"); Text("No background updates", style = MaterialTheme.typography.bodySmall) }
+                Switch(checked = manualOnly, onCheckedChange = { 
+                    manualOnly = it
+                    if (it) {
+                        if (selectedRate > 0) previousRate = selectedRate
+                        selectedRate = -1
+                    } else {
+                        selectedRate = previousRate
+                    }
+                })
+            }
+
+            val skipNightEnabled = !manualOnly
+            Row(modifier = Modifier.fillMaxWidth().clickable(enabled = skipNightEnabled) { skipNight = !skipNight }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.alpha(if (skipNightEnabled) 1f else 0.5f)) { Text("Skip automated Night Refresh"); Text("Pause during hours", style = MaterialTheme.typography.bodySmall) }
+                Switch(checked = skipNight, onCheckedChange = { skipNight = it }, enabled = skipNightEnabled)
+            }
+
+            if (skipNight && skipNightEnabled) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    TimeBox(label = "Start", time = skipStart, modifier = Modifier.weight(1f), onClick = { showTimePicker(context, skipStart) { skipStart = it } })
+                    TimeBox(label = "End", time = skipEnd, modifier = Modifier.weight(1f), onClick = { showTimePicker(context, skipEnd) { skipEnd = it } })
+                }
+            }
+
+            HorizontalDivider()
+            
+            Column {
+                Text("Discrete Refresh Times", style = MaterialTheme.typography.titleMedium)
+                Text("Override rules to refresh at exact times.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Note: Android battery optimizations may delay background refreshes by 15+ minutes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(discreteTimes) { time ->
+                        androidx.compose.material3.InputChip(
+                            selected = false,
+                            onClick = { /* do nothing on click, just allow delete */ },
+                            label = { Text(time) },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { discreteTimes = discreteTimes.filter { it != time } },
+                                    modifier = Modifier.size(16.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove")
+                                }
+                            }
+                        )
+                    }
+                }
+                
+                OutlinedButton(
+                    onClick = {
+                        showTimePicker(context, "12:00") { newTime ->
+                            if (newTime !in discreteTimes) {
+                                discreteTimes = (discreteTimes + listOf(newTime)).sorted()
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Time")
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add Exact Refresh Time")
                 }
             }
 
@@ -357,67 +467,6 @@ fun ConfigScreen(
                         )
                         Text("%", style = MaterialTheme.typography.bodyMedium)
                     }
-                }
-            }
-
-            Row(modifier = Modifier.fillMaxWidth().clickable { manualOnly = !manualOnly }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text("Manual Only"); Text("No background updates", style = MaterialTheme.typography.bodySmall) }
-                Switch(checked = manualOnly, onCheckedChange = { manualOnly = it })
-            }
-
-            Row(modifier = Modifier.fillMaxWidth().clickable { skipNight = !skipNight }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text("Skip Night"); Text("Pause during hours", style = MaterialTheme.typography.bodySmall) }
-                Switch(checked = skipNight, onCheckedChange = { skipNight = it })
-            }
-
-            if (skipNight) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    TimeBox(label = "Start", time = skipStart, modifier = Modifier.weight(1f), onClick = { showTimePicker(context, skipStart) { skipStart = it } })
-                    TimeBox(label = "End", time = skipEnd, modifier = Modifier.weight(1f), onClick = { showTimePicker(context, skipEnd) { skipEnd = it } })
-                }
-            }
-
-            HorizontalDivider()
-            
-            Column {
-                Text("Discrete Refresh Times", style = MaterialTheme.typography.titleMedium)
-                Text("Override rules to refresh at exact times.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Note: Android battery optimizations may delay background refreshes by 15+ minutes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                
-                androidx.compose.foundation.lazy.LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(discreteTimes) { time ->
-                        androidx.compose.material3.InputChip(
-                            selected = false,
-                            onClick = { /* do nothing on click, just allow delete */ },
-                            label = { Text(time) },
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = { discreteTimes = discreteTimes.filter { it != time } },
-                                    modifier = Modifier.size(16.dp)
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Remove")
-                                }
-                            }
-                        )
-                    }
-                }
-                
-                OutlinedButton(
-                    onClick = {
-                        showTimePicker(context, "12:00") { newTime ->
-                            if (newTime !in discreteTimes) {
-                                discreteTimes = (discreteTimes + listOf(newTime)).sorted()
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Time")
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add Exact Refresh Time")
                 }
             }
         }
