@@ -5,7 +5,11 @@ import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -29,8 +33,56 @@ class ImageRefreshWorker(
 
     companion object {
         const val KEY_IS_MANUAL = "is_manual"
+        const val KEY_IS_DISCRETE = "is_discrete"
         const val KEY_WIDGET_ID = "app_widget_id"
         const val IMAGE_URL = "https://picsum.photos/1024/1024"
+
+        fun scheduleDiscreteRefreshes(context: android.content.Context, widgetId: Int, timesString: String) {
+            val workManager = WorkManager.getInstance(context)
+            workManager.cancelAllWorkByTag("discrete_refresh_$widgetId")
+
+            if (timesString.isBlank()) return
+
+            val times = timesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            val now = java.util.Calendar.getInstance()
+
+            for (time in times) {
+                val parts = time.split(":")
+                if (parts.size != 2) continue
+                val hour = parts[0].toIntOrNull() ?: continue
+                val minute = parts[1].toIntOrNull() ?: continue
+
+                val targetTime = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, hour)
+                    set(java.util.Calendar.MINUTE, minute)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+
+                if (targetTime.before(now) || targetTime.timeInMillis == now.timeInMillis) {
+                    targetTime.add(java.util.Calendar.DAY_OF_YEAR, 1)
+                }
+
+                val delayMillis = targetTime.timeInMillis - now.timeInMillis
+
+                val request = OneTimeWorkRequestBuilder<ImageRefreshWorker>()
+                    .setInitialDelay(delayMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .addTag("discrete_refresh_$widgetId")
+                    .addTag("discrete_refresh_${widgetId}_${time}")
+                    .setInputData(workDataOf(
+                        KEY_WIDGET_ID to widgetId,
+                        KEY_IS_DISCRETE to true
+                    ))
+                    .build()
+
+                workManager.enqueueUniqueWork(
+                    "discrete_refresh_${widgetId}_${time}",
+                    ExistingWorkPolicy.REPLACE,
+                    request
+                )
+                Log.d("ImageWorker", "Scheduled discrete refresh for $time (in ${delayMillis / 1000}s) for widget $widgetId")
+            }
+        }
     }
 
     override suspend fun doWork(): Result {
@@ -38,6 +90,7 @@ class ImageRefreshWorker(
         if (widgetId == -1) return Result.success()
 
         val isManual = inputData.getBoolean(KEY_IS_MANUAL, false)
+        val isDiscrete = inputData.getBoolean(KEY_IS_DISCRETE, false)
 
         if (!NetworkUtils.isNetworkAvailable(applicationContext)) {
             Log.d("ImageWorker", "Skipping update due to no internet connection")
@@ -46,7 +99,7 @@ class ImageRefreshWorker(
         }
         
         // Skip night logic
-        if (!isManual) {
+        if (!isManual && !isDiscrete) {
             if (isNightModeActive(applicationContext, widgetId)) {
                 val startStr = WidgetState.getSkipStart(applicationContext, widgetId)
                 val endStr = WidgetState.getSkipEnd(applicationContext, widgetId)
@@ -145,8 +198,13 @@ class ImageRefreshWorker(
                 if (finalFile.exists() && finalFile.length() > 0) {
                     WidgetState.setLastUpdated(applicationContext, widgetId, System.currentTimeMillis().toString())
                     val isNight = isNightModeActive(applicationContext, widgetId)
-                    updateWidgetStatus(widgetId, if (isNight) "Zzz (Night)" else "OK")
+                    updateWidgetStatus(widgetId, if (isNight && !isDiscrete) "Zzz (Night)" else "OK")
                     Log.d("ImageWorker", "[SUCCESS] ID: $widgetId")
+                    
+                    if (isDiscrete) {
+                        scheduleDiscreteRefreshes(applicationContext, widgetId, WidgetState.getDiscreteTimes(applicationContext, widgetId))
+                    }
+
                     Result.success()
                 } else {
                     updateWidgetStatus(widgetId, "Empty File")
