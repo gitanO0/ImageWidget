@@ -360,6 +360,50 @@ fun ConfigScreen(
                 }
             }
 
+            HorizontalDivider()
+            
+            Column {
+                Text("Discrete Refresh Times", style = MaterialTheme.typography.titleMedium)
+                Text("Override rules to refresh at exact times.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Note: Android battery optimizations may delay background refreshes by 15+ minutes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(discreteTimes) { time ->
+                        androidx.compose.material3.InputChip(
+                            selected = false,
+                            onClick = { /* do nothing on click, just allow delete */ },
+                            label = { Text(time) },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { discreteTimes = discreteTimes.filter { it != time } },
+                                    modifier = Modifier.size(16.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove")
+                                }
+                            }
+                        )
+                    }
+                }
+                
+                OutlinedButton(
+                    onClick = {
+                        showTimePicker(context, "12:00") { newTime ->
+                            if (newTime !in discreteTimes) {
+                                discreteTimes = (discreteTimes + listOf(newTime)).sorted()
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Time")
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add Exact Refresh Time")
+                }
+            }
+
             ExposedDropdownMenuBox(expanded = scaleExpanded, onExpandedChange = { scaleExpanded = !scaleExpanded }) {
                 OutlinedTextField(value = scaleLabels[selectedScale] ?: selectedScale, onValueChange = {}, readOnly = true, label = { Text("Fitting") },
                     modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) })
@@ -423,50 +467,6 @@ fun ConfigScreen(
                         )
                         Text("%", style = MaterialTheme.typography.bodyMedium)
                     }
-                }
-            }
-
-            HorizontalDivider()
-            
-            Column {
-                Text("Discrete Refresh Times", style = MaterialTheme.typography.titleMedium)
-                Text("Override rules to refresh at exact times.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Note: Android battery optimizations may delay background refreshes by 15+ minutes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                
-                androidx.compose.foundation.lazy.LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(discreteTimes) { time ->
-                        androidx.compose.material3.InputChip(
-                            selected = false,
-                            onClick = { /* do nothing on click, just allow delete */ },
-                            label = { Text(time) },
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = { discreteTimes = discreteTimes.filter { it != time } },
-                                    modifier = Modifier.size(16.dp)
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Remove")
-                                }
-                            }
-                        )
-                    }
-                }
-                
-                OutlinedButton(
-                    onClick = {
-                        showTimePicker(context, "12:00") { newTime ->
-                            if (newTime !in discreteTimes) {
-                                discreteTimes = (discreteTimes + listOf(newTime)).sorted()
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Time")
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add Exact Refresh Time")
                 }
             }
         }
