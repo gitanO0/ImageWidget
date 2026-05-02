@@ -280,7 +280,7 @@ object WidgetState {
         return getPrefs(context).getString(KEY_DISCRETE_TIMES + widgetId, "") ?: ""
     }
 
-    fun getNextDiscreteTime(context: Context, widgetId: Int): String? {
+    fun getNextDiscreteTime(context: Context, widgetId: Int): Long? {
         val timesString = getDiscreteTimes(context, widgetId)
         if (timesString.isBlank()) return null
         
@@ -288,7 +288,7 @@ object WidgetState {
         if (times.isEmpty()) return null
 
         val now = java.util.Calendar.getInstance()
-        var nextTimeStr: String? = null
+        var nextTimeMillis: Long? = null
         var minDelay = Long.MAX_VALUE
 
         for (time in times) {
@@ -311,10 +311,46 @@ object WidgetState {
             val delay = targetTime.timeInMillis - now.timeInMillis
             if (delay < minDelay) {
                 minDelay = delay
-                nextTimeStr = time
+                nextTimeMillis = targetTime.timeInMillis
             }
         }
-        return nextTimeStr
+        return nextTimeMillis
+    }
+
+    fun getUnifiedNextRefreshTime(context: Context, widgetId: Int): String? {
+        if (getManualOnly(context, widgetId)) {
+            val nextDiscrete = getNextDiscreteTime(context, widgetId)
+            return if (nextDiscrete != null) {
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = nextDiscrete }
+                String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
+            } else null
+        }
+
+        val lastUpdatedStr = getLastUpdatedRaw(context, widgetId)
+        var estimatedPeriodicTimeMillis: Long? = null
+        
+        if (lastUpdatedStr != "0") {
+            val lastUpdatedMillis = lastUpdatedStr.toLongOrNull()
+            if (lastUpdatedMillis != null) {
+                val rateMinutes = getRefreshRate(context, widgetId)
+                estimatedPeriodicTimeMillis = lastUpdatedMillis + (rateMinutes * 60 * 1000L)
+            }
+        }
+
+        val nextDiscreteTimeMillis = getNextDiscreteTime(context, widgetId)
+
+        val nextTimeMillis = when {
+            estimatedPeriodicTimeMillis != null && nextDiscreteTimeMillis != null -> 
+                minOf(estimatedPeriodicTimeMillis, nextDiscreteTimeMillis)
+            estimatedPeriodicTimeMillis != null -> estimatedPeriodicTimeMillis
+            nextDiscreteTimeMillis != null -> nextDiscreteTimeMillis
+            else -> null
+        }
+
+        if (nextTimeMillis == null) return null
+
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = nextTimeMillis }
+        return String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
     }
 
     fun clear(context: Context, widgetId: Int) {
