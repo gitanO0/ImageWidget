@@ -382,6 +382,7 @@ fun ConfigScreen(
             Column {
                 Text("Discrete Refresh Times", style = MaterialTheme.typography.titleMedium)
                 Text("Override rules to refresh at exact times.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Note: Android battery optimizations may delay background refreshes by 15+ minutes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 
                 androidx.compose.foundation.lazy.LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
