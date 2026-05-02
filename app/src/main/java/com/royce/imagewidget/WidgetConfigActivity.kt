@@ -14,6 +14,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.InputChip
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -57,6 +61,7 @@ class WidgetConfigActivity : ComponentActivity() {
         val currentSkipNight = WidgetState.getSkipNight(this, appWidgetId)
         val currentSkipStart = WidgetState.getSkipStart(this, appWidgetId)
         val currentSkipEnd = WidgetState.getSkipEnd(this, appWidgetId)
+        val currentDiscreteTimes = WidgetState.getDiscreteTimes(this, appWidgetId)
 
         setContent {
             ImageWidgetTheme {
@@ -76,15 +81,16 @@ class WidgetConfigActivity : ComponentActivity() {
                         initialSkipNight = currentSkipNight,
                         initialSkipStart = currentSkipStart,
                         initialSkipEnd = currentSkipEnd,
-                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end -> 
-                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end) 
+                        initialDiscreteTimes = currentDiscreteTimes
+                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes -> 
+                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes)
                     }
                 }
             }
         }
     }
 
-    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String) {
+    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String, discreteTimes: String) {
         WidgetState.setUrl(this, appWidgetId, url)
         WidgetState.setClickUrl(this, appWidgetId, clickUrl)
         WidgetState.setRefreshRate(this, appWidgetId, rate)
@@ -96,6 +102,7 @@ class WidgetConfigActivity : ComponentActivity() {
         WidgetState.setSkipNight(this, appWidgetId, skipNight)
         WidgetState.setSkipStart(this, appWidgetId, skipStart)
         WidgetState.setSkipEnd(this, appWidgetId, skipEnd)
+        WidgetState.setDiscreteTimes(this, appWidgetId, discreteTimes)
         
         lifecycleScope.launch {
             val context = applicationContext
@@ -114,6 +121,8 @@ class WidgetConfigActivity : ComponentActivity() {
             } else {
                 WorkManager.getInstance(context).cancelUniqueWork("image_refresh_$appWidgetId")
             }
+
+            ImageRefreshWorker.scheduleDiscreteRefreshes(context, appWidgetId, discreteTimes)
 
             // ATOMIC TRIGGER: One-time work with UNIQUE policy REPLACE
             val request = OneTimeWorkRequestBuilder<ImageRefreshWorker>()
@@ -141,8 +150,8 @@ class WidgetConfigActivity : ComponentActivity() {
 fun ConfigScreen(
     initialUrl: String, initialClickUrl: String, initialRate: Int, initialScale: String, initialManual: Boolean, initialZoom: Float, 
     initialZoomCenterX: Float, initialZoomCenterY: Float,
-    initialSkipNight: Boolean, initialSkipStart: String, initialSkipEnd: String,
-    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String) -> Unit
+    initialSkipNight: Boolean, initialSkipStart: String, initialSkipEnd: String, initialDiscreteTimes: String,
+    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String, String) -> Unit
 ) {
     var url by remember { mutableStateOf(initialUrl) }
     var clickUrl by remember { mutableStateOf(initialClickUrl) }
@@ -155,6 +164,7 @@ fun ConfigScreen(
     var skipNight by remember { mutableStateOf(initialSkipNight) }
     var skipStart by remember { mutableStateOf(initialSkipStart) }
     var skipEnd by remember { mutableStateOf(initialSkipEnd) }
+    var discreteTimes by remember { mutableStateOf(initialDiscreteTimes.split(",").filter { it.isNotBlank() }) }
 
     var rateExpanded by remember { mutableStateOf(false) }
     var scaleExpanded by remember { mutableStateOf(false) }
@@ -239,7 +249,9 @@ fun ConfigScreen(
                                         url = profile.url; clickUrl = profile.clickUrl; selectedRate = profile.rate; selectedScale = profile.scale
                                         selectedZoom = profile.zoom; zoomCenterX = profile.zoomCenterX; zoomCenterY = profile.zoomCenterY
                                         manualOnly = profile.manual; skipNight = profile.skipNight
-                                        skipStart = profile.skipStart; skipEnd = profile.skipEnd; profilesExpanded = false
+                                        skipStart = profile.skipStart; skipEnd = profile.skipEnd
+                                        discreteTimes = profile.discreteTimes.split(",").filter { it.isNotBlank() }
+                                        profilesExpanded = false
                                         currentLoadedProfile = profile.name
                                     }
                                 )
@@ -364,6 +376,49 @@ fun ConfigScreen(
                     TimeBox(label = "End", time = skipEnd, modifier = Modifier.weight(1f), onClick = { showTimePicker(context, skipEnd) { skipEnd = it } })
                 }
             }
+
+            HorizontalDivider()
+            
+            Column {
+                Text("Discrete Refresh Times", style = MaterialTheme.typography.titleMedium)
+                Text("Override rules to refresh at exact times.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(discreteTimes) { time ->
+                        androidx.compose.material3.InputChip(
+                            selected = false,
+                            onClick = { /* do nothing on click, just allow delete */ },
+                            label = { Text(time) },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { discreteTimes = discreteTimes.filter { it != time } },
+                                    modifier = Modifier.size(16.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove")
+                                }
+                            }
+                        )
+                    }
+                }
+                
+                OutlinedButton(
+                    onClick = {
+                        showTimePicker(context, "12:00") { newTime ->
+                            if (newTime !in discreteTimes) {
+                                discreteTimes = (discreteTimes + listOf(newTime)).sorted()
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Time")
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add Exact Refresh Time")
+                }
+            }
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -374,7 +429,7 @@ fun ConfigScreen(
                 }, 
                 modifier = Modifier.weight(1f)
             ) { Text("Save Profile") }
-            Button(onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
+            Button(onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(",")) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
         }
     }
 
@@ -418,7 +473,7 @@ fun ConfigScreen(
             confirmButton = {
                 TextButton(onClick = {
                     if (profileName.isNotBlank()) {
-                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd))
+                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(",")))
                         if (isSaved) {
                             Toast.makeText(context, "Profile '$profileName' saved successfully", Toast.LENGTH_SHORT).show()
                         } else {

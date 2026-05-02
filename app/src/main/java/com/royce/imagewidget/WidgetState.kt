@@ -26,6 +26,7 @@ object WidgetState {
     private const val KEY_SKIP_NIGHT = "skip_night_"
     private const val KEY_SKIP_START = "skip_start_"
     private const val KEY_SKIP_END = "skip_end_"
+    private const val KEY_DISCRETE_TIMES = "discrete_times_"
 
     private const val PROFS_PREFS_NAME = "image_widget_profiles"
     
@@ -49,7 +50,8 @@ object WidgetState {
         val manual: Boolean,
         val skipNight: Boolean,
         val skipStart: String,
-        val skipEnd: String
+        val skipEnd: String,
+        val discreteTimes: String = ""
     ) {
         fun toJson(): String {
             val json = JSONObject()
@@ -64,6 +66,7 @@ object WidgetState {
             json.put("skipNight", skipNight)
             json.put("skipStart", skipStart)
             json.put("skipEnd", skipEnd)
+            json.put("discreteTimes", discreteTimes)
             return json.toString()
         }
 
@@ -82,7 +85,8 @@ object WidgetState {
                     manual = json.getBoolean("manual"),
                     skipNight = json.optBoolean("skipNight", true),
                     skipStart = json.optString("skipStart", "00:00"),
-                    skipEnd = json.optString("skipEnd", "06:00")
+                    skipEnd = json.optString("skipEnd", "06:00"),
+                    discreteTimes = json.optString("discreteTimes", "")
                 )
             }
         }
@@ -268,6 +272,14 @@ object WidgetState {
         return getPrefs(context).getString(KEY_SKIP_END + widgetId, "06:00") ?: "06:00"
     }
 
+    fun setDiscreteTimes(context: Context, widgetId: Int, times: String) {
+        getPrefs(context).edit { putString(KEY_DISCRETE_TIMES + widgetId, times) }
+    }
+
+    fun getDiscreteTimes(context: Context, widgetId: Int): String {
+        return getPrefs(context).getString(KEY_DISCRETE_TIMES + widgetId, "") ?: ""
+    }
+
     fun clear(context: Context, widgetId: Int) {
         getPrefs(context).edit {
             remove(KEY_URL + widgetId)
@@ -283,6 +295,7 @@ object WidgetState {
                 .remove(KEY_SKIP_NIGHT + widgetId)
                 .remove(KEY_SKIP_START + widgetId)
                 .remove(KEY_SKIP_END + widgetId)
+                .remove(KEY_DISCRETE_TIMES + widgetId)
         }
         
         imageFile(context, widgetId).delete()
