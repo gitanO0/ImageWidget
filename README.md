@@ -3,7 +3,8 @@
 [![Latest Release](https://img.shields.io/github/v/release/gitanO0/ImageWidget?label=Latest%20Release&color=success&style=for-the-badge)](https://github.com/gitanO0/ImageWidget/releases/latest)
 [![Download APK](https://img.shields.io/badge/Download-APK-blue?style=for-the-badge&logo=android)](https://github.com/gitanO0/ImageWidget/releases/latest)
 
-A flexible Android Home Screen widget built with **Jetpack Glance** that displays images from any URL. Perfect for monitoring weather maps, webcams, or just keeping your favorite photos on your home screen.
+A flexible Android Home Screen widget built with **Jetpack Glance** that displays images from any URL. Perfect for monitoring weather maps, webcams, and real-time satellite imagery without the need to fire up a web browser or separate app.
+The images are always a fresh as you need them to be and ready on your homescreen.
 
 ## Features
 
