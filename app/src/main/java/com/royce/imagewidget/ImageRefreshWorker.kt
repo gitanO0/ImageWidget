@@ -41,9 +41,15 @@ class ImageRefreshWorker(
             val workManager = WorkManager.getInstance(context)
             workManager.cancelAllWorkByTag("discrete_refresh_$widgetId")
 
-            if (timesString.isBlank()) return
+            val times = timesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+            if (WidgetState.getSkipNight(context, widgetId)) {
+                val skipEnd = WidgetState.getSkipEnd(context, widgetId)
+                if (skipEnd.isNotEmpty() && !times.contains(skipEnd)) {
+                    times.add(skipEnd)
+                }
+            }
 
-            val times = timesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            if (times.isEmpty()) return
             val now = java.util.Calendar.getInstance()
 
             for (time in times) {
@@ -100,7 +106,7 @@ class ImageRefreshWorker(
         
         // Skip night logic
         if (!isManual && !isDiscrete) {
-            if (isNightModeActive(applicationContext, widgetId)) {
+            if (WidgetState.isNightModeActive(applicationContext, widgetId, System.currentTimeMillis())) {
                 val startStr = WidgetState.getSkipStart(applicationContext, widgetId)
                 val endStr = WidgetState.getSkipEnd(applicationContext, widgetId)
                 Log.d("ImageWorker", "Skipping update due to night mode ($startStr - $endStr)")
@@ -197,12 +203,25 @@ class ImageRefreshWorker(
                 
                 if (finalFile.exists() && finalFile.length() > 0) {
                     WidgetState.setLastUpdated(applicationContext, widgetId, System.currentTimeMillis().toString())
-                    val isNight = isNightModeActive(applicationContext, widgetId)
+                    val isNight = WidgetState.isNightModeActive(applicationContext, widgetId, System.currentTimeMillis())
                     updateWidgetStatus(widgetId, if (isNight && !isDiscrete) "Zzz (Night)" else "OK")
                     Log.d("ImageWorker", "[SUCCESS] ID: $widgetId")
                     
                     if (isDiscrete) {
                         scheduleDiscreteRefreshes(applicationContext, widgetId, WidgetState.getDiscreteTimes(applicationContext, widgetId))
+                    }
+
+                    // Reset the periodic interval so it counts from NOW
+                    if (!WidgetState.getManualOnly(applicationContext, widgetId)) {
+                        val rate = WidgetState.getRefreshRate(applicationContext, widgetId)
+                        val periodicRequest = androidx.work.PeriodicWorkRequestBuilder<ImageRefreshWorker>(rate.toLong(), java.util.concurrent.TimeUnit.MINUTES)
+                            .setInputData(workDataOf(KEY_WIDGET_ID to widgetId))
+                            .build()
+                        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+                            "image_refresh_$widgetId",
+                            androidx.work.ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
+                            periodicRequest
+                        )
                     }
 
                     Result.success()
@@ -233,32 +252,5 @@ class ImageRefreshWorker(
         } catch (e: Exception) {
             Log.e("ImageWorker", "Status update failed", e)
         }
-    }
-
-    private fun isNightModeActive(context: Context, widgetId: Int): Boolean {
-        val skipNight = WidgetState.getSkipNight(context, widgetId)
-        if (!skipNight) return false
-
-        val startStr = WidgetState.getSkipStart(context, widgetId)
-        val endStr = WidgetState.getSkipEnd(context, widgetId)
-        try {
-            val calNow = java.util.Calendar.getInstance()
-            val nowMinutes = calNow.get(java.util.Calendar.HOUR_OF_DAY) * 60 + calNow.get(java.util.Calendar.MINUTE)
-            
-            val startParts = startStr.split(":")
-            val startMinutes = startParts[0].toInt() * 60 + startParts[1].toInt()
-            
-            val endParts = endStr.split(":")
-            val endMinutes = endParts[0].toInt() * 60 + endParts[1].toInt()
-            
-            return if (startMinutes < endMinutes) {
-                nowMinutes in startMinutes..endMinutes
-            } else {
-                nowMinutes >= startMinutes || nowMinutes <= endMinutes
-            }
-        } catch (e: Exception) {
-            Log.e("ImageWorker", "Error parsing skip times", e)
-        }
-        return false
     }
 }
