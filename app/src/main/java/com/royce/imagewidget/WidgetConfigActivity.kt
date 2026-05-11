@@ -117,6 +117,7 @@ class WidgetConfigActivity : ComponentActivity() {
             if (!manual) {
                 val periodicRequest = PeriodicWorkRequestBuilder<ImageRefreshWorker>(rate.toLong(), TimeUnit.MINUTES)
                     .setInputData(workDataOf(ImageRefreshWorker.KEY_WIDGET_ID to appWidgetId))
+                    .setInitialDelay(rate.toLong(), TimeUnit.MINUTES)
                     .build()
                 WorkManager.getInstance(context).enqueueUniquePeriodicWork("image_refresh_$appWidgetId", ExistingPeriodicWorkPolicy.UPDATE, periodicRequest)
             } else {
