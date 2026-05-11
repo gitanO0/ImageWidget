@@ -280,11 +280,24 @@ object WidgetState {
         return getPrefs(context).getString(KEY_DISCRETE_TIMES + widgetId, "") ?: ""
     }
 
-    fun getNextDiscreteTime(context: Context, widgetId: Int): Long? {
+    fun getAllDiscreteTimesWithNightEnd(context: Context, widgetId: Int): List<String> {
         val timesString = getDiscreteTimes(context, widgetId)
-        if (timesString.isBlank()) return null
+        val times = mutableListOf<String>()
+        if (timesString.isNotBlank()) {
+            times.addAll(timesString.split(",").map { it.trim() }.filter { it.isNotEmpty() })
+        }
         
-        val times = timesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (getSkipNight(context, widgetId)) {
+            val skipEnd = getSkipEnd(context, widgetId)
+            if (skipEnd.isNotEmpty() && !times.contains(skipEnd)) {
+                times.add(skipEnd)
+            }
+        }
+        return times
+    }
+
+    fun getNextDiscreteTime(context: Context, widgetId: Int): Long? {
+        val times = getAllDiscreteTimesWithNightEnd(context, widgetId)
         if (times.isEmpty()) return null
 
         val now = java.util.Calendar.getInstance()
@@ -317,6 +330,31 @@ object WidgetState {
         return nextTimeMillis
     }
 
+    fun isNightModeActive(context: Context, widgetId: Int, timeMillis: Long): Boolean {
+        if (!getSkipNight(context, widgetId)) return false
+
+        val startStr = getSkipStart(context, widgetId)
+        val endStr = getSkipEnd(context, widgetId)
+        try {
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = timeMillis }
+            val nowMinutes = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+            
+            val startParts = startStr.split(":")
+            val startMinutes = startParts[0].toInt() * 60 + startParts[1].toInt()
+            
+            val endParts = endStr.split(":")
+            val endMinutes = endParts[0].toInt() * 60 + endParts[1].toInt()
+            
+            return if (startMinutes < endMinutes) {
+                nowMinutes in startMinutes..endMinutes
+            } else {
+                nowMinutes >= startMinutes || nowMinutes <= endMinutes
+            }
+        } catch (_: Exception) {
+            return false
+        }
+    }
+
     fun getUnifiedNextRefreshTime(context: Context, widgetId: Int): String? {
         if (getManualOnly(context, widgetId)) {
             val nextDiscrete = getNextDiscreteTime(context, widgetId)
@@ -338,6 +376,14 @@ object WidgetState {
         }
 
         val nextDiscreteTimeMillis = getNextDiscreteTime(context, widgetId)
+
+        val skipNight = getSkipNight(context, widgetId)
+        val currentlyInNightMode = skipNight && isNightModeActive(context, widgetId, System.currentTimeMillis())
+        val periodicInNightMode = skipNight && estimatedPeriodicTimeMillis != null && isNightModeActive(context, widgetId, estimatedPeriodicTimeMillis)
+
+        if (currentlyInNightMode || periodicInNightMode) {
+            estimatedPeriodicTimeMillis = null
+        }
 
         val nextTimeMillis = when {
             estimatedPeriodicTimeMillis != null && nextDiscreteTimeMillis != null -> 
