@@ -170,7 +170,6 @@ fun ConfigScreen(
 
     var rateExpanded by remember { mutableStateOf(false) }
     var scaleExpanded by remember { mutableStateOf(false) }
-    var zoomExpanded by remember { mutableStateOf(false) }
     val showProfileSaveDialog = remember { mutableStateOf(false) }
     var profileName by remember { mutableStateOf("") }
     
@@ -211,7 +210,6 @@ fun ConfigScreen(
     val rateLabels = mapOf(-1 to "None", 15 to "15 Min", 30 to "30 Min", 60 to "1 Hour", 240 to "4 Hours", 480 to "8 Hours", 1440 to "24 Hours")
     val scales = listOf("Crop", "Fit", "Fill")
     val scaleLabels = mapOf("Crop" to "Crop to Fit", "Fit" to "Fit Content", "Fill" to "Stretch")
-    val zooms = listOf(1.0f, 1.25f, 1.5f, 2.0f, 2.25f, 2.5f, 3.0f)
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -412,12 +410,16 @@ fun ConfigScreen(
                 }
             }
 
-            ExposedDropdownMenuBox(expanded = zoomExpanded, onExpandedChange = { zoomExpanded = !zoomExpanded }) {
-                OutlinedTextField(value = "${selectedZoom}x", onValueChange = {}, readOnly = true, label = { Text("Zoom Factor") },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = zoomExpanded) })
-                ExposedDropdownMenu(expanded = zoomExpanded, onDismissRequest = { zoomExpanded = false }) {
-                    zooms.forEach { z -> DropdownMenuItem(text = { Text("${z}x") }, onClick = { selectedZoom = z; zoomExpanded = false }) }
-                }
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Zoom Factor", style = MaterialTheme.typography.labelLarge)
+                Spacer(modifier = Modifier.height(8.dp))
+                com.royce.imagewidget.ui.components.DialControl(
+                    value = selectedZoom,
+                    onValueChange = { selectedZoom = it },
+                    valueRange = 1f..5f,
+                    modifier = Modifier.size(150.dp),
+                    steps = 16
+                )
             }
             
             if (selectedZoom > 1.0f) {
