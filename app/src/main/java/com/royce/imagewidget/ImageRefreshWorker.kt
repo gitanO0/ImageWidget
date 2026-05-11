@@ -216,6 +216,7 @@ class ImageRefreshWorker(
                         val rate = WidgetState.getRefreshRate(applicationContext, widgetId)
                         val periodicRequest = androidx.work.PeriodicWorkRequestBuilder<ImageRefreshWorker>(rate.toLong(), java.util.concurrent.TimeUnit.MINUTES)
                             .setInputData(workDataOf(KEY_WIDGET_ID to widgetId))
+                            .setInitialDelay(rate.toLong(), java.util.concurrent.TimeUnit.MINUTES)
                             .build()
                         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
                             "image_refresh_$widgetId",
