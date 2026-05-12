@@ -5,13 +5,13 @@ plugins {
 
 android {
     namespace = "com.royce.imagewidget"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.royce.imagewidget"
         minSdk = 24
-        versionCode = 14
-        versionName = "1.35"
+        versionCode = 15
+        versionName = "1.36"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
