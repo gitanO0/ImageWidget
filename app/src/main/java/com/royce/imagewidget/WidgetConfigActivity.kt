@@ -177,7 +177,35 @@ fun ConfigScreen(
     val context = LocalContext.current
     var profiles by remember { mutableStateOf(WidgetState.getProfiles(context)) }
     var profilesExpanded by remember { mutableStateOf(false) }
-    var currentLoadedProfile by remember { mutableStateOf("") }
+    
+    val exactMatchProfile by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, profiles) {
+        derivedStateOf {
+            val discreteStr = discreteTimes.joinToString(",")
+            val activeRate = if (manualOnly) -1 else selectedRate
+            profiles.find { 
+                it.url == url && 
+                it.clickUrl == clickUrl && 
+                it.rate == activeRate && 
+                it.scale == selectedScale && 
+                it.zoom == selectedZoom && 
+                it.zoomCenterX == zoomCenterX && 
+                it.zoomCenterY == zoomCenterY && 
+                it.manual == manualOnly && 
+                it.skipNight == skipNight && 
+                it.skipStart == skipStart && 
+                it.skipEnd == skipEnd && 
+                it.discreteTimes == discreteStr 
+            }?.name
+        }
+    }
+
+    var baseProfileName by remember { mutableStateOf("") }
+    LaunchedEffect(exactMatchProfile) {
+        if (exactMatchProfile != null) {
+            baseProfileName = exactMatchProfile!!
+        }
+    }
+    
     val scrollState = rememberScrollState()
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -218,7 +246,18 @@ fun ConfigScreen(
                 Column {
                     Text("Widget Configuration", style = MaterialTheme.typography.headlineSmall)
                     val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                    Text("v${packageInfo.versionName}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    
+                    val profileText = remember(exactMatchProfile, baseProfileName, profiles) {
+                        if (exactMatchProfile != null) {
+                            " • Profile: $exactMatchProfile"
+                        } else if (baseProfileName.isNotEmpty() && profiles.any { it.name == baseProfileName }) {
+                            " • Profile: $baseProfileName (changed)"
+                        } else {
+                            " • no profile present"
+                        }
+                    }
+                    
+                    Text("v${packageInfo.versionName}$profileText", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 Box {
@@ -232,7 +271,11 @@ fun ConfigScreen(
                             modifier = Modifier.size(48.dp) // 2x bigger than typical 24dp
                         )
                     }
-                    DropdownMenu(expanded = profilesExpanded, onDismissRequest = { profilesExpanded = false }) {
+                    DropdownMenu(
+                        expanded = profilesExpanded, 
+                        onDismissRequest = { profilesExpanded = false },
+                        modifier = Modifier.heightIn(max = 250.dp)
+                    ) {
                         if (profiles.isNotEmpty()) {
                             profiles.forEach { profile ->
                                 DropdownMenuItem(
@@ -241,7 +284,6 @@ fun ConfigScreen(
                                         IconButton(onClick = {
                                             WidgetState.deleteProfile(context, profile.name)
                                             profiles = WidgetState.getProfiles(context)
-                                            if (currentLoadedProfile == profile.name) currentLoadedProfile = ""
                                         }) {
                                             Icon(Icons.Default.Delete, contentDescription = "Delete Profile")
                                         }
@@ -262,7 +304,6 @@ fun ConfigScreen(
                                         skipStart = profile.skipStart; skipEnd = profile.skipEnd
                                         discreteTimes = profile.discreteTimes.split(",").filter { it.isNotBlank() }
                                         profilesExpanded = false
-                                        currentLoadedProfile = profile.name
                                     }
                                 )
                             }
@@ -477,7 +518,7 @@ fun ConfigScreen(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = { 
-                    profileName = currentLoadedProfile
+                    profileName = exactMatchProfile ?: baseProfileName
                     showProfileSaveDialog.value = true 
                 }, 
                 modifier = Modifier.weight(1f)
@@ -508,7 +549,8 @@ fun ConfigScreen(
                     if (profiles.isNotEmpty()) {
                         ExposedDropdownMenu(
                             expanded = profileDropdownExpanded,
-                            onDismissRequest = { profileDropdownExpanded = false }
+                            onDismissRequest = { profileDropdownExpanded = false },
+                            modifier = Modifier.heightIn(max = 250.dp)
                         ) {
                             profiles.forEach { p ->
                                 DropdownMenuItem(
@@ -526,14 +568,13 @@ fun ConfigScreen(
             confirmButton = {
                 TextButton(onClick = {
                     if (profileName.isNotBlank()) {
-                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(",")))
+                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, if(manualOnly) -1 else selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(",")))
                         if (isSaved) {
                             Toast.makeText(context, "Profile '$profileName' saved successfully", Toast.LENGTH_SHORT).show()
                         } else {
                             Toast.makeText(context, "Failed to save profile", Toast.LENGTH_SHORT).show()
                         }
                         profiles = WidgetState.getProfiles(context)
-                        currentLoadedProfile = profileName
                         showProfileSaveDialog.value = false
                     }
                 }) { Text("Save") }

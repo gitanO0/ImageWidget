@@ -156,14 +156,14 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
 
         // 3. Controls Overlay (Bottom)
         Box(
-            modifier = GlanceModifier.fillMaxSize().padding(bottom = 4.dp),
+            modifier = GlanceModifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter
         ) {
             Row(
                 modifier = GlanceModifier
                     .background(ColorProvider(Color(0x66000000)))
                     .cornerRadius(8.dp)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .padding(horizontal = 4.dp, vertical = 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val isProcessing = status == "Starting..." || status == "Refreshing..." || status == "Downloading..."
