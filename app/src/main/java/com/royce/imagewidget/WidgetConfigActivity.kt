@@ -63,6 +63,7 @@ class WidgetConfigActivity : ComponentActivity() {
         val currentSkipStart = WidgetState.getSkipStart(this, appWidgetId)
         val currentSkipEnd = WidgetState.getSkipEnd(this, appWidgetId)
         val currentDiscreteTimes = WidgetState.getDiscreteTimes(this, appWidgetId)
+        val currentRotate90 = WidgetState.getRotate90(this, appWidgetId)
 
         setContent {
             ImageWidgetTheme {
@@ -82,16 +83,17 @@ class WidgetConfigActivity : ComponentActivity() {
                         initialSkipNight = currentSkipNight,
                         initialSkipStart = currentSkipStart,
                         initialSkipEnd = currentSkipEnd,
-                        initialDiscreteTimes = currentDiscreteTimes
-                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes -> 
-                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes)
+                        initialDiscreteTimes = currentDiscreteTimes,
+                        initialRotate90 = currentRotate90
+                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90 -> 
+                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90)
                     }
                 }
             }
         }
     }
 
-    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String, discreteTimes: String) {
+    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String, discreteTimes: String, rotate90: Boolean) {
         WidgetState.setUrl(this, appWidgetId, url)
         WidgetState.setClickUrl(this, appWidgetId, clickUrl)
         WidgetState.setRefreshRate(this, appWidgetId, rate)
@@ -104,6 +106,7 @@ class WidgetConfigActivity : ComponentActivity() {
         WidgetState.setSkipStart(this, appWidgetId, skipStart)
         WidgetState.setSkipEnd(this, appWidgetId, skipEnd)
         WidgetState.setDiscreteTimes(this, appWidgetId, discreteTimes)
+        WidgetState.setRotate90(this, appWidgetId, rotate90)
         
         lifecycleScope.launch {
             val context = applicationContext
@@ -153,7 +156,8 @@ fun ConfigScreen(
     initialUrl: String, initialClickUrl: String, initialRate: Int, initialScale: String, initialManual: Boolean, initialZoom: Float, 
     initialZoomCenterX: Float, initialZoomCenterY: Float,
     initialSkipNight: Boolean, initialSkipStart: String, initialSkipEnd: String, initialDiscreteTimes: String,
-    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String, String) -> Unit
+    initialRotate90: Boolean,
+    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String, String, Boolean) -> Unit
 ) {
     var url by remember { mutableStateOf(initialUrl) }
     var clickUrl by remember { mutableStateOf(initialClickUrl) }
@@ -168,6 +172,7 @@ fun ConfigScreen(
     var skipStart by remember { mutableStateOf(initialSkipStart) }
     var skipEnd by remember { mutableStateOf(initialSkipEnd) }
     var discreteTimes by remember { mutableStateOf(initialDiscreteTimes.split(",").filter { it.isNotBlank() }) }
+    var rotate90 by remember { mutableStateOf(initialRotate90) }
 
     var rateExpanded by remember { mutableStateOf(false) }
     var scaleExpanded by remember { mutableStateOf(false) }
@@ -178,7 +183,7 @@ fun ConfigScreen(
     var profiles by remember { mutableStateOf(WidgetState.getProfiles(context)) }
     var profilesExpanded by remember { mutableStateOf(false) }
     
-    val exactMatchProfile by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, profiles) {
+    val exactMatchProfile by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, rotate90, profiles) {
         derivedStateOf {
             val discreteStr = discreteTimes.joinToString(",")
             val activeRate = if (manualOnly) -1 else selectedRate
@@ -194,7 +199,8 @@ fun ConfigScreen(
                 it.skipNight == skipNight && 
                 it.skipStart == skipStart && 
                 it.skipEnd == skipEnd && 
-                it.discreteTimes == discreteStr 
+                it.discreteTimes == discreteStr &&
+                it.rotate90 == rotate90
             }?.name
         }
     }
@@ -235,8 +241,8 @@ fun ConfigScreen(
         }
     }
 
-    val rates = listOf(-1, 15, 30, 60, 240, 480, 1440)
-    val rateLabels = mapOf(-1 to "None", 15 to "15 Min", 30 to "30 Min", 60 to "1 Hour", 240 to "4 Hours", 480 to "8 Hours", 1440 to "24 Hours")
+    val rates = listOf(-1, 15, 30, 60, 120, 240, 480, 1440)
+    val rateLabels = mapOf(-1 to "None", 15 to "15 Min", 30 to "30 Min", 60 to "1 Hour", 120 to "2 Hours", 240 to "4 Hours", 480 to "8 Hours", 1440 to "24 Hours")
     val scales = listOf("Crop", "Fit", "Fill")
     val scaleLabels = mapOf("Crop" to "Crop to Fit", "Fit" to "Fit Content", "Fill" to "Stretch")
 
@@ -303,6 +309,7 @@ fun ConfigScreen(
                                         skipNight = profile.skipNight
                                         skipStart = profile.skipStart; skipEnd = profile.skipEnd
                                         discreteTimes = profile.discreteTimes.split(",").filter { it.isNotBlank() }
+                                        rotate90 = profile.rotate90
                                         profilesExpanded = false
                                     }
                                 )
@@ -452,6 +459,11 @@ fun ConfigScreen(
                 }
             }
 
+            Row(modifier = Modifier.fillMaxWidth().clickable { rotate90 = !rotate90 }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column { Text("Rotate 90°"); Text("For landscape presentation", style = MaterialTheme.typography.bodySmall) }
+                Switch(checked = rotate90, onCheckedChange = { rotate90 = it })
+            }
+
             Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Zoom Factor", style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -523,7 +535,7 @@ fun ConfigScreen(
                 }, 
                 modifier = Modifier.weight(1f)
             ) { Text("Save Profile") }
-            Button(onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(",")) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
+            Button(onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
         }
     }
 
@@ -568,7 +580,7 @@ fun ConfigScreen(
             confirmButton = {
                 TextButton(onClick = {
                     if (profileName.isNotBlank()) {
-                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, if(manualOnly) -1 else selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(",")))
+                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, if(manualOnly) -1 else selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90))
                         if (isSaved) {
                             Toast.makeText(context, "Profile '$profileName' saved successfully", Toast.LENGTH_SHORT).show()
                         } else {
