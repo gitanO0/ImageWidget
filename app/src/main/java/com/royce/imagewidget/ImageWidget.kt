@@ -57,7 +57,20 @@ class ImageWidget : GlanceAppWidget() {
             // PRE-DECODE BITMAP ON BACKGROUND THREAD
             // Use 400x400 to stay safely under the 1MB IPC limit
             val bitmap = if (imageFile.exists() && (imageFile.length() > 0)) {
-                val decoded = decodeSampledBitmapFromFile(imageFile.absolutePath, 400, 400)
+                var decoded = decodeSampledBitmapFromFile(imageFile.absolutePath, 400, 400)
+                
+                val rotate90 = WidgetState.getRotate90(context, appWidgetId)
+                if (rotate90 && decoded != null) {
+                    try {
+                        val matrix = android.graphics.Matrix().apply { postRotate(90f) }
+                        val rotated = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+                        if (rotated != decoded) decoded.recycle()
+                        decoded = rotated
+                    } catch (e: Exception) {
+                        Log.e("ImageWidget", "Error rotating bitmap", e)
+                    }
+                }
+
                 val zoom = WidgetState.getZoomFactor(context, appWidgetId)
                 if (decoded != null && zoom > 1.0f) {
                     try {

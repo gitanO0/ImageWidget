@@ -27,6 +27,7 @@ object WidgetState {
     private const val KEY_SKIP_START = "skip_start_"
     private const val KEY_SKIP_END = "skip_end_"
     private const val KEY_DISCRETE_TIMES = "discrete_times_"
+    private const val KEY_ROTATE_90 = "rotate_90_"
 
     private const val PROFS_PREFS_NAME = "image_widget_profiles"
     
@@ -51,7 +52,8 @@ object WidgetState {
         val skipNight: Boolean,
         val skipStart: String,
         val skipEnd: String,
-        val discreteTimes: String = ""
+        val discreteTimes: String = "",
+        val rotate90: Boolean = false
     ) {
         fun toJson(): String {
             val json = JSONObject()
@@ -67,6 +69,7 @@ object WidgetState {
             json.put("skipStart", skipStart)
             json.put("skipEnd", skipEnd)
             json.put("discreteTimes", discreteTimes)
+            json.put("rotate90", rotate90)
             return json.toString()
         }
 
@@ -86,7 +89,8 @@ object WidgetState {
                     skipNight = json.optBoolean("skipNight", true),
                     skipStart = json.optString("skipStart", "00:00"),
                     skipEnd = json.optString("skipEnd", "06:00"),
-                    discreteTimes = json.optString("discreteTimes", "")
+                    discreteTimes = json.optString("discreteTimes", ""),
+                    rotate90 = json.optBoolean("rotate90", false)
                 )
             }
         }
@@ -280,6 +284,14 @@ object WidgetState {
         return getPrefs(context).getString(KEY_DISCRETE_TIMES + widgetId, "") ?: ""
     }
 
+    fun setRotate90(context: Context, widgetId: Int, value: Boolean) {
+        getPrefs(context).edit { putBoolean(KEY_ROTATE_90 + widgetId, value) }
+    }
+
+    fun getRotate90(context: Context, widgetId: Int): Boolean {
+        return getPrefs(context).getBoolean(KEY_ROTATE_90 + widgetId, false)
+    }
+
     fun getAllDiscreteTimesWithNightEnd(context: Context, widgetId: Int): List<String> {
         val timesString = getDiscreteTimes(context, widgetId)
         val times = mutableListOf<String>()
@@ -415,6 +427,7 @@ object WidgetState {
                 .remove(KEY_SKIP_START + widgetId)
                 .remove(KEY_SKIP_END + widgetId)
                 .remove(KEY_DISCRETE_TIMES + widgetId)
+                .remove(KEY_ROTATE_90 + widgetId)
         }
         
         imageFile(context, widgetId).delete()
