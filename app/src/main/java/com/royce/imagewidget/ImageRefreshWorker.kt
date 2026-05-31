@@ -131,14 +131,16 @@ class ImageRefreshWorker(
                 var currentUrl = cacheBustedUrl
                 var redirectCount = 0
                 val maxRedirects = 3
+                val timeoutSeconds = WidgetState.getTimeout(applicationContext, widgetId)
+                val timeoutMillis = timeoutSeconds * 1000
                 
                 val finalConnection = withContext(Dispatchers.IO) {
                     var lastConn: HttpURLConnection? = null
                     while (redirectCount < maxRedirects) {
                         lastConn = URL(currentUrl).openConnection() as HttpURLConnection
                         lastConn.apply {
-                            connectTimeout = 10000
-                            readTimeout = 10000
+                            connectTimeout = timeoutMillis
+                            readTimeout = timeoutMillis
                             instanceFollowRedirects = true
                             setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
                             connect()

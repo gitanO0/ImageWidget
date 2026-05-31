@@ -28,6 +28,7 @@ object WidgetState {
     private const val KEY_SKIP_END = "skip_end_"
     private const val KEY_DISCRETE_TIMES = "discrete_times_"
     private const val KEY_ROTATE_90 = "rotate_90_"
+    private const val KEY_TIMEOUT = "timeout_"
 
     private const val PROFS_PREFS_NAME = "image_widget_profiles"
     
@@ -53,7 +54,8 @@ object WidgetState {
         val skipStart: String,
         val skipEnd: String,
         val discreteTimes: String = "",
-        val rotate90: Boolean = false
+        val rotate90: Boolean = false,
+        val timeout: Int = 15
     ) {
         fun toJson(): String {
             val json = JSONObject()
@@ -70,6 +72,7 @@ object WidgetState {
             json.put("skipEnd", skipEnd)
             json.put("discreteTimes", discreteTimes)
             json.put("rotate90", rotate90)
+            json.put("timeout", timeout)
             return json.toString()
         }
 
@@ -90,7 +93,8 @@ object WidgetState {
                     skipStart = json.optString("skipStart", "00:00"),
                     skipEnd = json.optString("skipEnd", "06:00"),
                     discreteTimes = json.optString("discreteTimes", ""),
-                    rotate90 = json.optBoolean("rotate90", false)
+                    rotate90 = json.optBoolean("rotate90", false),
+                    timeout = json.optInt("timeout", 15)
                 )
             }
         }
@@ -177,6 +181,14 @@ object WidgetState {
 
     fun getRefreshRate(context: Context, widgetId: Int): Int {
         return getPrefs(context).getInt(KEY_REFRESH_RATE + widgetId, 15)
+    }
+
+    fun setTimeout(context: Context, widgetId: Int, seconds: Int) {
+        getPrefs(context).edit { putInt(KEY_TIMEOUT + widgetId, seconds) }
+    }
+
+    fun getTimeout(context: Context, widgetId: Int): Int {
+        return getPrefs(context).getInt(KEY_TIMEOUT + widgetId, 15)
     }
 
     fun setLastUpdated(context: Context, widgetId: Int, value: String) {
@@ -428,6 +440,7 @@ object WidgetState {
                 .remove(KEY_SKIP_END + widgetId)
                 .remove(KEY_DISCRETE_TIMES + widgetId)
                 .remove(KEY_ROTATE_90 + widgetId)
+                .remove(KEY_TIMEOUT + widgetId)
         }
         
         imageFile(context, widgetId).delete()
