@@ -64,6 +64,7 @@ class WidgetConfigActivity : ComponentActivity() {
         val currentSkipEnd = WidgetState.getSkipEnd(this, appWidgetId)
         val currentDiscreteTimes = WidgetState.getDiscreteTimes(this, appWidgetId)
         val currentRotate90 = WidgetState.getRotate90(this, appWidgetId)
+        val currentTimeout = WidgetState.getTimeout(this, appWidgetId)
 
         setContent {
             ImageWidgetTheme {
@@ -84,16 +85,17 @@ class WidgetConfigActivity : ComponentActivity() {
                         initialSkipStart = currentSkipStart,
                         initialSkipEnd = currentSkipEnd,
                         initialDiscreteTimes = currentDiscreteTimes,
-                        initialRotate90 = currentRotate90
-                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90 -> 
-                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90)
+                        initialRotate90 = currentRotate90,
+                        initialTimeout = currentTimeout
+                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90, timeout -> 
+                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90, timeout)
                     }
                 }
             }
         }
     }
 
-    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String, discreteTimes: String, rotate90: Boolean) {
+    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String, discreteTimes: String, rotate90: Boolean, timeout: Int) {
         WidgetState.setUrl(this, appWidgetId, url)
         WidgetState.setClickUrl(this, appWidgetId, clickUrl)
         WidgetState.setRefreshRate(this, appWidgetId, rate)
@@ -107,6 +109,7 @@ class WidgetConfigActivity : ComponentActivity() {
         WidgetState.setSkipEnd(this, appWidgetId, skipEnd)
         WidgetState.setDiscreteTimes(this, appWidgetId, discreteTimes)
         WidgetState.setRotate90(this, appWidgetId, rotate90)
+        WidgetState.setTimeout(this, appWidgetId, timeout)
         
         lifecycleScope.launch {
             val context = applicationContext
@@ -157,7 +160,8 @@ fun ConfigScreen(
     initialZoomCenterX: Float, initialZoomCenterY: Float,
     initialSkipNight: Boolean, initialSkipStart: String, initialSkipEnd: String, initialDiscreteTimes: String,
     initialRotate90: Boolean,
-    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String, String, Boolean) -> Unit
+    initialTimeout: Int,
+    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String, String, Boolean, Int) -> Unit
 ) {
     var url by remember { mutableStateOf(initialUrl) }
     var clickUrl by remember { mutableStateOf(initialClickUrl) }
@@ -173,9 +177,11 @@ fun ConfigScreen(
     var skipEnd by remember { mutableStateOf(initialSkipEnd) }
     var discreteTimes by remember { mutableStateOf(initialDiscreteTimes.split(",").filter { it.isNotBlank() }) }
     var rotate90 by remember { mutableStateOf(initialRotate90) }
+    var selectedTimeout by remember { mutableIntStateOf(initialTimeout) }
 
     var rateExpanded by remember { mutableStateOf(false) }
     var scaleExpanded by remember { mutableStateOf(false) }
+    var timeoutExpanded by remember { mutableStateOf(false) }
     val showProfileSaveDialog = remember { mutableStateOf(false) }
     var profileName by remember { mutableStateOf("") }
     
@@ -183,7 +189,7 @@ fun ConfigScreen(
     var profiles by remember { mutableStateOf(WidgetState.getProfiles(context)) }
     var profilesExpanded by remember { mutableStateOf(false) }
     
-    val exactMatchProfile by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, rotate90, profiles) {
+    val exactMatchProfile by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, rotate90, selectedTimeout, profiles) {
         derivedStateOf {
             val discreteStr = discreteTimes.joinToString(",")
             val activeRate = if (manualOnly) -1 else selectedRate
@@ -200,7 +206,8 @@ fun ConfigScreen(
                 it.skipStart == skipStart && 
                 it.skipEnd == skipEnd && 
                 it.discreteTimes == discreteStr &&
-                it.rotate90 == rotate90
+                it.rotate90 == rotate90 &&
+                it.timeout == selectedTimeout
             }?.name
         }
     }
@@ -310,6 +317,7 @@ fun ConfigScreen(
                                         skipStart = profile.skipStart; skipEnd = profile.skipEnd
                                         discreteTimes = profile.discreteTimes.split(",").filter { it.isNotBlank() }
                                         rotate90 = profile.rotate90
+                                        selectedTimeout = profile.timeout
                                         profilesExpanded = false
                                     }
                                 )
@@ -343,6 +351,30 @@ fun ConfigScreen(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Leave blank to open Image URL") }
             )
+
+            val timeouts = listOf(15, 30, 60, 120)
+            val timeoutLabels = mapOf(15 to "15 Seconds", 30 to "30 Seconds", 60 to "60 Seconds", 120 to "120 Seconds")
+            ExposedDropdownMenuBox(expanded = timeoutExpanded, onExpandedChange = { timeoutExpanded = !timeoutExpanded }) {
+                OutlinedTextField(
+                    value = timeoutLabels[selectedTimeout] ?: "$selectedTimeout Seconds", 
+                    onValueChange = {}, 
+                    readOnly = true, 
+                    label = { Text("Download Timeout") },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true), 
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = timeoutExpanded) }
+                )
+                ExposedDropdownMenu(expanded = timeoutExpanded, onDismissRequest = { timeoutExpanded = false }) {
+                    timeouts.forEach { timeout -> 
+                        DropdownMenuItem(
+                            text = { Text(timeoutLabels[timeout] ?: "$timeout Seconds") }, 
+                            onClick = { 
+                                selectedTimeout = timeout
+                                timeoutExpanded = false 
+                            }
+                        ) 
+                    }
+                }
+            }
 
             ExposedDropdownMenuBox(expanded = rateExpanded && !manualOnly, onExpandedChange = { if (!manualOnly) rateExpanded = !rateExpanded }) {
                 OutlinedTextField(
@@ -535,7 +567,7 @@ fun ConfigScreen(
                 }, 
                 modifier = Modifier.weight(1f)
             ) { Text("Save Profile") }
-            Button(onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
+            Button(onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90, selectedTimeout) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
         }
     }
 
@@ -580,7 +612,7 @@ fun ConfigScreen(
             confirmButton = {
                 TextButton(onClick = {
                     if (profileName.isNotBlank()) {
-                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, if(manualOnly) -1 else selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90))
+                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, if(manualOnly) -1 else selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90, selectedTimeout))
                         if (isSaved) {
                             Toast.makeText(context, "Profile '$profileName' saved successfully", Toast.LENGTH_SHORT).show()
                         } else {
