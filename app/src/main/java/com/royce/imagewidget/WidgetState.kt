@@ -81,14 +81,14 @@ object WidgetState {
                 val json = JSONObject(jsonStr)
                 return WidgetProfile(
                     name = name,
-                    url = json.getString("url"),
+                    url = json.optString("url", ""),
                     clickUrl = json.optString("clickUrl", ""),
-                    rate = json.getInt("rate"),
-                    scale = json.getString("scale"),
-                    zoom = json.getDouble("zoom").toFloat(),
+                    rate = json.optInt("rate", 15),
+                    scale = json.optString("scale", "Crop"),
+                    zoom = json.optDouble("zoom", 1.0).toFloat(),
                     zoomCenterX = json.optDouble("zoomCenterX", 0.5).toFloat(),
                     zoomCenterY = json.optDouble("zoomCenterY", 0.5).toFloat(),
-                    manual = json.getBoolean("manual"),
+                    manual = json.optBoolean("manual", false),
                     skipNight = json.optBoolean("skipNight", true),
                     skipStart = json.optString("skipStart", "00:00"),
                     skipEnd = json.optString("skipEnd", "06:00"),
@@ -135,17 +135,26 @@ object WidgetState {
     fun importProfiles(context: Context, jsonString: String): Int {
         var count = 0
         try {
-            val prefs = getProfilePrefs(context)
             val root = JSONObject(jsonString)
             val keys = root.keys()
             while (keys.hasNext()) {
                 val name = keys.next()
-                if (!prefs.contains(name)) {
-                    val profileJson = root.getJSONObject(name)
-                    val profile = WidgetProfile.fromJson(name, profileJson.toString())
+                try {
+                    val profileJsonRaw = root.get(name)
+                    val profileJsonStr = if (profileJsonRaw is String) {
+                        // Handle double-serialized JSON from version 1.38
+                        profileJsonRaw
+                    } else {
+                        // Handle correct nested JSONObject
+                        profileJsonRaw.toString()
+                    }
+                    
+                    val profile = WidgetProfile.fromJson(name, profileJsonStr)
                     if (saveProfile(context, profile)) {
                         count++
                     }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         } catch (e: Exception) {
