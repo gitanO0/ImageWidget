@@ -57,39 +57,13 @@ class ImageWidget : GlanceAppWidget() {
             // PRE-DECODE BITMAP ON BACKGROUND THREAD
             // Use 400x400 to stay safely under the 1MB IPC limit
             val bitmap = if (imageFile.exists() && (imageFile.length() > 0)) {
-                var decoded = decodeSampledBitmapFromFile(imageFile.absolutePath, 400, 400)
-                
                 val rotate90 = WidgetState.getRotate90(context, appWidgetId)
-                if (rotate90 && decoded != null) {
-                    try {
-                        val matrix = android.graphics.Matrix().apply { postRotate(90f) }
-                        val rotated = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
-                        if (rotated != decoded) decoded.recycle()
-                        decoded = rotated
-                    } catch (e: Exception) {
-                        Log.e("ImageWidget", "Error rotating bitmap", e)
-                    }
-                }
-
                 val zoom = WidgetState.getZoomFactor(context, appWidgetId)
-                if (decoded != null && zoom > 1.0f) {
-                    try {
-                        val w = decoded.width
-                        val h = decoded.height
-                        val newW = (w / zoom).toInt()
-                        val newH = (h / zoom).toInt()
-                        
-                        val centerX = WidgetState.getZoomCenterX(context, appWidgetId)
-                        val centerY = WidgetState.getZoomCenterY(context, appWidgetId)
-                        
-                        val x = ((w - newW) * centerX).toInt().coerceIn(0, w - newW)
-                        val y = ((h - newH) * centerY).toInt().coerceIn(0, h - newH)
-
-                        val cropped = Bitmap.createBitmap(decoded, x, y, newW, newH)
-                        if (cropped != decoded) decoded.recycle()
-                        cropped
-                    } catch (_: Exception) { decoded }
-                } else decoded
+                val centerX = WidgetState.getZoomCenterX(context, appWidgetId)
+                val centerY = WidgetState.getZoomCenterY(context, appWidgetId)
+                
+                // Binder IPC limit is 1MB. Max safe ARGB_8888 bitmap size is 500x500 (1MB exactly).
+                decodeZoomedSampledBitmapFromFile(imageFile.absolutePath, 500, 500, rotate90, zoom, centerX, centerY)
             } else null
 
             ImageWidgetContent(context, appWidgetId, status, bitmap)
@@ -227,22 +201,87 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
     }
 }
 
-@Suppress("SameParameterValue")
-private fun decodeSampledBitmapFromFile(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHeight: Int, rotate90: Boolean, zoom: Float, centerX: Float, centerY: Float): Bitmap? {
     return try {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, options)
-        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
-        options.inJustDecodeBounds = false
-        BitmapFactory.decodeFile(path, options)
+        val origW = options.outWidth
+        val origH = options.outHeight
+        if (origW <= 0 || origH <= 0) return null
+
+        val apparentW = if (rotate90) origH else origW
+        val apparentH = if (rotate90) origW else origH
+
+        val zoomActual = if (zoom < 1.0f) 1.0f else zoom
+        val cropW = (apparentW / zoomActual).toInt().coerceAtLeast(1)
+        val cropH = (apparentH / zoomActual).toInt().coerceAtLeast(1)
+
+        val axLeft = ((apparentW - cropW) * centerX).toInt().coerceIn(0, apparentW - cropW)
+        val ayTop = ((apparentH - cropH) * centerY).toInt().coerceIn(0, apparentH - cropH)
+        val axRight = axLeft + cropW
+        val ayBottom = ayTop + cropH
+
+        val origRect = if (rotate90) {
+            android.graphics.Rect(ayTop, origH - axRight, ayBottom, origH - axLeft)
+        } else {
+            android.graphics.Rect(axLeft, ayTop, axRight, ayBottom)
+        }
+
+        val decoder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            android.graphics.BitmapRegionDecoder.newInstance(path)
+        } else {
+            @Suppress("DEPRECATION")
+            android.graphics.BitmapRegionDecoder.newInstance(path, false)
+        }
+
+        if (decoder != null) {
+            val decodeOptions = BitmapFactory.Options()
+            val regionW = origRect.width()
+            val regionH = origRect.height()
+            
+            decodeOptions.inSampleSize = calculateInSampleSize(regionW, regionH, reqWidth, reqHeight)
+            val decodedRegion = decoder.decodeRegion(origRect, decodeOptions)
+            decoder.recycle()
+            
+            if (decodedRegion != null && rotate90) {
+                val matrix = android.graphics.Matrix().apply { postRotate(90f) }
+                val rotated = Bitmap.createBitmap(decodedRegion, 0, 0, decodedRegion.width, decodedRegion.height, matrix, true)
+                if (rotated != decodedRegion) decodedRegion.recycle()
+                return rotated
+            }
+            return decodedRegion
+        } else {
+            // Fallback
+            options.inSampleSize = calculateInSampleSize(origW, origH, reqWidth, reqHeight)
+            options.inJustDecodeBounds = false
+            var bmp = BitmapFactory.decodeFile(path, options) ?: return null
+            
+            if (rotate90) {
+                val matrix = android.graphics.Matrix().apply { postRotate(90f) }
+                val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+                if (rotated != bmp) bmp.recycle()
+                bmp = rotated
+            }
+            if (zoomActual > 1.0f) {
+                val w = bmp.width
+                val h = bmp.height
+                val newW = (w / zoomActual).toInt().coerceAtLeast(1)
+                val newH = (h / zoomActual).toInt().coerceAtLeast(1)
+                val x = ((w - newW) * centerX).toInt().coerceIn(0, w - newW)
+                val y = ((h - newH) * centerY).toInt().coerceIn(0, h - newH)
+                val cropped = Bitmap.createBitmap(bmp, x, y, newW, newH)
+                if (cropped != bmp) bmp.recycle()
+                bmp = cropped
+            }
+            return bmp
+        }
     } catch (e: Exception) {
-        Log.e("ImageWidget", "Error decoding bitmap", e)
+        Log.e("ImageWidget", "Error decoding zoomed bitmap", e)
         null
     }
 }
 
-private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
-    val (height: Int, width: Int) = options.outHeight to options.outWidth
+private fun calculateInSampleSize(width: Int, height: Int, reqWidth: Int, reqHeight: Int): Int {
     var inSampleSize = 1
     if (height > reqHeight || width > reqWidth) {
         val halfHeight: Int = height / 2
