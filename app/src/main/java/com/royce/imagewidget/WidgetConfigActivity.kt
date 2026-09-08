@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.foundation.lazy.items
@@ -178,6 +180,27 @@ fun ConfigScreen(
     var discreteTimes by remember { mutableStateOf(initialDiscreteTimes.split(",").filter { it.isNotBlank() }) }
     var rotate90 by remember { mutableStateOf(initialRotate90) }
     var selectedTimeout by remember { mutableIntStateOf(initialTimeout) }
+
+    val configChanged by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, rotate90, selectedTimeout) {
+        derivedStateOf {
+            val discreteStr = discreteTimes.joinToString(",")
+            val activeRate = if (manualOnly) -1 else selectedRate
+            url != initialUrl ||
+            clickUrl != initialClickUrl ||
+            activeRate != initialRate ||
+            selectedScale != initialScale ||
+            selectedZoom != initialZoom ||
+            zoomCenterX != initialZoomCenterX ||
+            zoomCenterY != initialZoomCenterY ||
+            manualOnly != initialManual ||
+            skipNight != initialSkipNight ||
+            skipStart != initialSkipStart ||
+            skipEnd != initialSkipEnd ||
+            discreteStr != initialDiscreteTimes ||
+            rotate90 != initialRotate90 ||
+            selectedTimeout != initialTimeout
+        }
+    }
 
     var rateExpanded by remember { mutableStateOf(false) }
     var scaleExpanded by remember { mutableStateOf(false) }
@@ -560,14 +583,37 @@ fun ConfigScreen(
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+            val pulseScale by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 1.05f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulseScale"
+            )
+
+            // Profile needs saving if we have a base profile we loaded from, and there are changes made relative to it
+            val profileNeedsSaving = baseProfileName.isNotEmpty() && configChanged
+            val saveProfileColor = if (profileNeedsSaving) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+            val profileModifier = if (profileNeedsSaving) Modifier.weight(1f).graphicsLayer { scaleX = pulseScale; scaleY = pulseScale } else Modifier.weight(1f)
             OutlinedButton(
                 onClick = { 
                     profileName = exactMatchProfile ?: baseProfileName
                     showProfileSaveDialog.value = true 
                 }, 
-                modifier = Modifier.weight(1f)
+                modifier = profileModifier,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = saveProfileColor)
             ) { Text("Save Profile") }
-            Button(onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90, selectedTimeout) }, modifier = Modifier.weight(1f)) { Text("Save Config") }
+            
+            val saveConfigColor = if (configChanged) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            val configModifier = if (configChanged) Modifier.weight(1f).graphicsLayer { scaleX = pulseScale; scaleY = pulseScale } else Modifier.weight(1f)
+            Button(
+                onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90, selectedTimeout) }, 
+                modifier = configModifier,
+                colors = ButtonDefaults.buttonColors(containerColor = saveConfigColor)
+            ) { Text("Save Config") }
         }
     }
 
