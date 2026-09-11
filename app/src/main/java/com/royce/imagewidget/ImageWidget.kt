@@ -237,6 +237,7 @@ private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHe
         if (decoder != null) {
             val decodeOptions = BitmapFactory.Options().apply {
                 inPreferredConfig = Bitmap.Config.RGB_565
+                inScaled = false
             }
             val regionW = origRect.width()
             val regionH = origRect.height()
@@ -257,6 +258,7 @@ private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHe
             options.inSampleSize = calculateInSampleSize(origW, origH, reqWidth, reqHeight)
             options.inJustDecodeBounds = false
             options.inPreferredConfig = Bitmap.Config.RGB_565
+            options.inScaled = false
             var bmp = BitmapFactory.decodeFile(path, options) ?: return null
             
             if (rotate90) {
@@ -284,6 +286,7 @@ private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHe
             // Fallback for gifs/unsupported formats: just decode it normally without region decoder
             val fallbackOptions = BitmapFactory.Options().apply {
                 inPreferredConfig = Bitmap.Config.RGB_565
+                inScaled = false
             }
             val bmp = BitmapFactory.decodeFile(path, fallbackOptions) ?: return null
             val zoomActual = if (zoom < 1.0f) 1.0f else zoom
