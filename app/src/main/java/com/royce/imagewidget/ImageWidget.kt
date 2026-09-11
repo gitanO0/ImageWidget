@@ -62,8 +62,8 @@ class ImageWidget : GlanceAppWidget() {
                 val centerX = WidgetState.getZoomCenterX(context, appWidgetId)
                 val centerY = WidgetState.getZoomCenterY(context, appWidgetId)
                 
-                // Binder IPC limit is 1MB. Max safe ARGB_8888 bitmap size is 500x500 (1MB exactly).
-                decodeZoomedSampledBitmapFromFile(imageFile.absolutePath, 500, 500, rotate90, zoom, centerX, centerY)
+                // Binder IPC limit is 1MB. Max safe RGB_565 bitmap size is 707x707 (exactly 1,000,000 bytes)
+                decodeZoomedSampledBitmapFromFile(imageFile.absolutePath, 707, 707, rotate90, zoom, centerX, centerY)
             } else null
 
             ImageWidgetContent(context, appWidgetId, status, bitmap)
@@ -235,7 +235,9 @@ private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHe
         }
 
         if (decoder != null) {
-            val decodeOptions = BitmapFactory.Options()
+            val decodeOptions = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
             val regionW = origRect.width()
             val regionH = origRect.height()
             
@@ -254,6 +256,7 @@ private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHe
             // Fallback
             options.inSampleSize = calculateInSampleSize(origW, origH, reqWidth, reqHeight)
             options.inJustDecodeBounds = false
+            options.inPreferredConfig = Bitmap.Config.RGB_565
             var bmp = BitmapFactory.decodeFile(path, options) ?: return null
             
             if (rotate90) {
@@ -279,7 +282,10 @@ private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHe
         Log.e("ImageWidget", "Error decoding zoomed bitmap", e)
         try {
             // Fallback for gifs/unsupported formats: just decode it normally without region decoder
-            val bmp = BitmapFactory.decodeFile(path) ?: return null
+            val fallbackOptions = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            val bmp = BitmapFactory.decodeFile(path, fallbackOptions) ?: return null
             val zoomActual = if (zoom < 1.0f) 1.0f else zoom
             var finalBmp = bmp
             if (rotate90) {
@@ -307,7 +313,7 @@ private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHe
                 val scale = minOf(reqWidth.toFloat() / finalW, reqHeight.toFloat() / finalH)
                 val scaledW = (finalW * scale).toInt().coerceAtLeast(1)
                 val scaledH = (finalH * scale).toInt().coerceAtLeast(1)
-                val scaled = Bitmap.createScaledBitmap(finalBmp, scaledW, scaledH, true)
+                val scaled = Bitmap.createScaledBitmap(finalBmp, scaledW, scaledH, false)
                 if (scaled != finalBmp) finalBmp.recycle()
                 finalBmp = scaled
             }
