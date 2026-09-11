@@ -102,48 +102,54 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
             ),
         contentAlignment = Alignment.Center
     ) {
-        // 1. The Image (Background)
-        if (bitmap != null) {
-            Image(
-                provider = ImageProvider(bitmap),
-                contentDescription = "Latest image",
-                contentScale = contentScale,
-                modifier = GlanceModifier
-                    .fillMaxSize()
-            )
-        } else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = GlanceModifier.padding(16.dp)
-            ) {
-                Text(
-                    "Image Widget",
-                    style = TextStyle(color = ColorProvider(Color.LightGray), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        // Container for Image and Status (padded so it doesn't overlap the bottom controls)
+        Box(
+            modifier = GlanceModifier.fillMaxSize().padding(bottom = 26.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // 1. The Image (Background)
+            if (bitmap != null) {
+                Image(
+                    provider = ImageProvider(bitmap),
+                    contentDescription = "Latest image",
+                    contentScale = contentScale,
+                    modifier = GlanceModifier
+                        .fillMaxSize()
                 )
-                Text(
-                    text = if (status != "OK") status else "Waiting for image...",
-                    style = TextStyle(color = ColorProvider(Color.LightGray), fontSize = 12.sp)
-                )
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = GlanceModifier.padding(16.dp)
+                ) {
+                    Text(
+                        "Image Widget",
+                        style = TextStyle(color = ColorProvider(Color.LightGray), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        text = if (status != "OK") status else "Waiting for image...",
+                        style = TextStyle(color = ColorProvider(Color.LightGray), fontSize = 12.sp)
+                    )
+                }
             }
-        }
 
-        // 2. Status overlay (Top Right)
-        if (status != "OK") {
-            Box(
-                modifier = GlanceModifier.fillMaxSize().padding(8.dp),
-                contentAlignment = Alignment.TopEnd
-            ) {
-                Text(
-                    text = status,
-                    style = TextStyle(color = ColorProvider(Color.White), fontSize = 10.sp),
-                    modifier = GlanceModifier.background(ColorProvider(Color(0x80000000))).padding(4.dp)
-                )
+            // 2. Status overlay (Top Right)
+            if (status != "OK") {
+                Box(
+                    modifier = GlanceModifier.fillMaxSize().padding(8.dp),
+                    contentAlignment = Alignment.TopEnd
+                ) {
+                    Text(
+                        text = status,
+                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 10.sp),
+                        modifier = GlanceModifier.background(ColorProvider(Color(0x80000000))).padding(4.dp)
+                    )
+                }
             }
         }
 
         // 3. Controls Overlay (Bottom)
         Box(
-            modifier = GlanceModifier.fillMaxSize(),
+            modifier = GlanceModifier.fillMaxSize().padding(bottom = 4.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Row(
