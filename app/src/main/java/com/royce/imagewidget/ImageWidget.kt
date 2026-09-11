@@ -277,7 +277,46 @@ private fun decodeZoomedSampledBitmapFromFile(path: String, reqWidth: Int, reqHe
         }
     } catch (e: Exception) {
         Log.e("ImageWidget", "Error decoding zoomed bitmap", e)
-        null
+        try {
+            // Fallback for gifs/unsupported formats: just decode it normally without region decoder
+            val bmp = BitmapFactory.decodeFile(path) ?: return null
+            val zoomActual = if (zoom < 1.0f) 1.0f else zoom
+            var finalBmp = bmp
+            if (rotate90) {
+                val matrix = android.graphics.Matrix().apply { postRotate(90f) }
+                val rotated = Bitmap.createBitmap(finalBmp, 0, 0, finalBmp.width, finalBmp.height, matrix, true)
+                if (rotated != finalBmp) finalBmp.recycle()
+                finalBmp = rotated
+            }
+            if (zoomActual > 1.0f) {
+                val w = finalBmp.width
+                val h = finalBmp.height
+                val newW = (w / zoomActual).toInt().coerceAtLeast(1)
+                val newH = (h / zoomActual).toInt().coerceAtLeast(1)
+                val x = ((w - newW) * centerX).toInt().coerceIn(0, w - newW)
+                val y = ((h - newH) * centerY).toInt().coerceIn(0, h - newH)
+                val cropped = Bitmap.createBitmap(finalBmp, x, y, newW, newH)
+                if (cropped != finalBmp) finalBmp.recycle()
+                finalBmp = cropped
+            }
+            
+            // Still need to scale down if it's too big
+            val finalW = finalBmp.width
+            val finalH = finalBmp.height
+            if (finalW > reqWidth || finalH > reqHeight) {
+                val scale = minOf(reqWidth.toFloat() / finalW, reqHeight.toFloat() / finalH)
+                val scaledW = (finalW * scale).toInt().coerceAtLeast(1)
+                val scaledH = (finalH * scale).toInt().coerceAtLeast(1)
+                val scaled = Bitmap.createScaledBitmap(finalBmp, scaledW, scaledH, true)
+                if (scaled != finalBmp) finalBmp.recycle()
+                finalBmp = scaled
+            }
+            
+            return finalBmp
+        } catch (e2: Exception) {
+            Log.e("ImageWidget", "Fallback decode failed", e2)
+            return null
+        }
     }
 }
 
