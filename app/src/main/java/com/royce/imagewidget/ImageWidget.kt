@@ -82,6 +82,7 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
     val manualOnly = WidgetState.getManualOnly(context, appWidgetId)
     val scaleType = WidgetState.getScaleType(context, appWidgetId)
     val nextRefreshTime = WidgetState.getUnifiedNextRefreshTime(context, appWidgetId)
+    val refreshTop = WidgetState.getRefreshTop(context, appWidgetId)
     
     Log.d("ImageWidget", "[RENDER] ID: $appWidgetId, Status: $status, HasBitmap: ${bitmap != null}")
 
@@ -102,55 +103,49 @@ private fun ImageWidgetContent(context: Context, appWidgetId: Int, status: Strin
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Container for Image and Status (padded so it doesn't overlap the bottom controls)
-        Box(
-            modifier = GlanceModifier.fillMaxSize().padding(bottom = 26.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // 1. The Image (Background)
-            if (bitmap != null) {
-                Image(
-                    provider = ImageProvider(bitmap),
-                    contentDescription = "Latest image",
-                    contentScale = contentScale,
-                    modifier = GlanceModifier
-                        .fillMaxSize()
+        // 1. The Image (Background)
+        if (bitmap != null) {
+            Image(
+                provider = ImageProvider(bitmap),
+                contentDescription = "Latest image",
+                contentScale = contentScale,
+                modifier = GlanceModifier
+                    .fillMaxSize()
+            )
+        } else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = GlanceModifier.padding(16.dp)
+            ) {
+                Text(
+                    "Image Widget",
+                    style = TextStyle(color = ColorProvider(Color.LightGray), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 )
-            } else {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = GlanceModifier.padding(16.dp)
-                ) {
-                    Text(
-                        "Image Widget",
-                        style = TextStyle(color = ColorProvider(Color.LightGray), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    )
-                    Text(
-                        text = if (status != "OK") status else "Waiting for image...",
-                        style = TextStyle(color = ColorProvider(Color.LightGray), fontSize = 12.sp)
-                    )
-                }
-            }
-
-            // 2. Status overlay (Top Right)
-            if (status != "OK") {
-                Box(
-                    modifier = GlanceModifier.fillMaxSize().padding(8.dp),
-                    contentAlignment = Alignment.TopEnd
-                ) {
-                    Text(
-                        text = status,
-                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 10.sp),
-                        modifier = GlanceModifier.background(ColorProvider(Color(0x80000000))).padding(4.dp)
-                    )
-                }
+                Text(
+                    text = if (status != "OK") status else "Waiting for image...",
+                    style = TextStyle(color = ColorProvider(Color.LightGray), fontSize = 12.sp)
+                )
             }
         }
 
-        // 3. Controls Overlay (Bottom)
+        // 2. Status overlay (Top Right)
+        if (status != "OK") {
+            Box(
+                modifier = GlanceModifier.fillMaxSize().padding(8.dp),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                Text(
+                    text = status,
+                    style = TextStyle(color = ColorProvider(Color.White), fontSize = 10.sp),
+                    modifier = GlanceModifier.background(ColorProvider(Color(0x80000000))).padding(4.dp)
+                )
+            }
+        }
+
+        // 3. Controls Overlay (Top or Bottom)
         Box(
-            modifier = GlanceModifier.fillMaxSize().padding(bottom = 4.dp),
-            contentAlignment = Alignment.BottomCenter
+            modifier = GlanceModifier.fillMaxSize(),
+            contentAlignment = if (refreshTop) Alignment.TopCenter else Alignment.BottomCenter
         ) {
             Row(
                 modifier = GlanceModifier
