@@ -29,6 +29,7 @@ object WidgetState {
     private const val KEY_DISCRETE_TIMES = "discrete_times_"
     private const val KEY_ROTATE_90 = "rotate_90_"
     private const val KEY_TIMEOUT = "timeout_"
+    private const val KEY_REFRESH_TOP = "refresh_top_"
 
     private const val PROFS_PREFS_NAME = "image_widget_profiles"
     
@@ -55,7 +56,8 @@ object WidgetState {
         val skipEnd: String,
         val discreteTimes: String = "",
         val rotate90: Boolean = false,
-        val timeout: Int = 15
+        val timeout: Int = 15,
+        val refreshTop: Boolean = false
     ) {
         fun toJson(): String {
             val json = JSONObject()
@@ -73,6 +75,7 @@ object WidgetState {
             json.put("discreteTimes", discreteTimes)
             json.put("rotate90", rotate90)
             json.put("timeout", timeout)
+            json.put("refreshTop", refreshTop)
             return json.toString()
         }
 
@@ -94,7 +97,8 @@ object WidgetState {
                     skipEnd = json.optString("skipEnd", "06:00"),
                     discreteTimes = json.optString("discreteTimes", ""),
                     rotate90 = json.optBoolean("rotate90", false),
-                    timeout = json.optInt("timeout", 15)
+                    timeout = json.optInt("timeout", 15),
+                    refreshTop = json.optBoolean("refreshTop", false)
                 )
             }
         }
@@ -313,6 +317,14 @@ object WidgetState {
         return getPrefs(context).getBoolean(KEY_ROTATE_90 + widgetId, false)
     }
 
+    fun setRefreshTop(context: Context, widgetId: Int, value: Boolean) {
+        getPrefs(context).edit { putBoolean(KEY_REFRESH_TOP + widgetId, value) }
+    }
+
+    fun getRefreshTop(context: Context, widgetId: Int): Boolean {
+        return getPrefs(context).getBoolean(KEY_REFRESH_TOP + widgetId, false)
+    }
+
     fun getAllDiscreteTimesWithNightEnd(context: Context, widgetId: Int): List<String> {
         val timesString = getDiscreteTimes(context, widgetId)
         val times = mutableListOf<String>()
@@ -450,6 +462,7 @@ object WidgetState {
                 .remove(KEY_DISCRETE_TIMES + widgetId)
                 .remove(KEY_ROTATE_90 + widgetId)
                 .remove(KEY_TIMEOUT + widgetId)
+                .remove(KEY_REFRESH_TOP + widgetId)
         }
         
         imageFile(context, widgetId).delete()

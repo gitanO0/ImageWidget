@@ -67,6 +67,7 @@ class WidgetConfigActivity : ComponentActivity() {
         val currentDiscreteTimes = WidgetState.getDiscreteTimes(this, appWidgetId)
         val currentRotate90 = WidgetState.getRotate90(this, appWidgetId)
         val currentTimeout = WidgetState.getTimeout(this, appWidgetId)
+        val currentRefreshTop = WidgetState.getRefreshTop(this, appWidgetId)
 
         setContent {
             ImageWidgetTheme {
@@ -88,16 +89,17 @@ class WidgetConfigActivity : ComponentActivity() {
                         initialSkipEnd = currentSkipEnd,
                         initialDiscreteTimes = currentDiscreteTimes,
                         initialRotate90 = currentRotate90,
-                        initialTimeout = currentTimeout
-                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90, timeout -> 
-                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90, timeout)
+                        initialTimeout = currentTimeout,
+                        initialRefreshTop = currentRefreshTop
+                    ) { url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90, timeout, refreshTop -> 
+                        saveConfig(url, clickUrl, rate, scale, manual, zoom, zoomCenterX, zoomCenterY, skipNight, start, end, discreteTimes, rotate90, timeout, refreshTop)
                     }
                 }
             }
         }
     }
 
-    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String, discreteTimes: String, rotate90: Boolean, timeout: Int) {
+    private fun saveConfig(url: String, clickUrl: String, rate: Int, scale: String, manual: Boolean, zoom: Float, zoomCenterX: Float, zoomCenterY: Float, skipNight: Boolean, skipStart: String, skipEnd: String, discreteTimes: String, rotate90: Boolean, timeout: Int, refreshTop: Boolean) {
         WidgetState.setUrl(this, appWidgetId, url)
         WidgetState.setClickUrl(this, appWidgetId, clickUrl)
         WidgetState.setRefreshRate(this, appWidgetId, rate)
@@ -112,6 +114,7 @@ class WidgetConfigActivity : ComponentActivity() {
         WidgetState.setDiscreteTimes(this, appWidgetId, discreteTimes)
         WidgetState.setRotate90(this, appWidgetId, rotate90)
         WidgetState.setTimeout(this, appWidgetId, timeout)
+        WidgetState.setRefreshTop(this, appWidgetId, refreshTop)
         
         lifecycleScope.launch {
             val context = applicationContext
@@ -163,7 +166,8 @@ fun ConfigScreen(
     initialSkipNight: Boolean, initialSkipStart: String, initialSkipEnd: String, initialDiscreteTimes: String,
     initialRotate90: Boolean,
     initialTimeout: Int,
-    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String, String, Boolean, Int) -> Unit
+    initialRefreshTop: Boolean,
+    onSave: (String, String, Int, String, Boolean, Float, Float, Float, Boolean, String, String, String, Boolean, Int, Boolean) -> Unit
 ) {
     var url by remember { mutableStateOf(initialUrl) }
     var clickUrl by remember { mutableStateOf(initialClickUrl) }
@@ -180,8 +184,9 @@ fun ConfigScreen(
     var discreteTimes by remember { mutableStateOf(initialDiscreteTimes.split(",").filter { it.isNotBlank() }) }
     var rotate90 by remember { mutableStateOf(initialRotate90) }
     var selectedTimeout by remember { mutableIntStateOf(initialTimeout) }
+    var refreshTop by remember { mutableStateOf(initialRefreshTop) }
 
-    val configChanged by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, rotate90, selectedTimeout) {
+    val configChanged by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, rotate90, selectedTimeout, refreshTop) {
         derivedStateOf {
             val discreteStr = discreteTimes.joinToString(",")
             val activeRate = if (manualOnly) -1 else selectedRate
@@ -198,7 +203,8 @@ fun ConfigScreen(
             skipEnd != initialSkipEnd ||
             discreteStr != initialDiscreteTimes ||
             rotate90 != initialRotate90 ||
-            selectedTimeout != initialTimeout
+            selectedTimeout != initialTimeout ||
+            refreshTop != initialRefreshTop
         }
     }
 
@@ -212,7 +218,7 @@ fun ConfigScreen(
     var profiles by remember { mutableStateOf(WidgetState.getProfiles(context)) }
     var profilesExpanded by remember { mutableStateOf(false) }
     
-    val exactMatchProfile by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, rotate90, selectedTimeout, profiles) {
+    val exactMatchProfile by remember(url, clickUrl, selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes, rotate90, selectedTimeout, refreshTop, profiles) {
         derivedStateOf {
             val discreteStr = discreteTimes.joinToString(",")
             val activeRate = if (manualOnly) -1 else selectedRate
@@ -230,7 +236,8 @@ fun ConfigScreen(
                 it.skipEnd == skipEnd && 
                 it.discreteTimes == discreteStr &&
                 it.rotate90 == rotate90 &&
-                it.timeout == selectedTimeout
+                it.timeout == selectedTimeout &&
+                it.refreshTop == refreshTop
             }?.name
         }
     }
@@ -341,6 +348,7 @@ fun ConfigScreen(
                                         discreteTimes = profile.discreteTimes.split(",").filter { it.isNotBlank() }
                                         rotate90 = profile.rotate90
                                         selectedTimeout = profile.timeout
+                                        refreshTop = profile.refreshTop
                                         profilesExpanded = false
                                     }
                                 )
@@ -519,6 +527,11 @@ fun ConfigScreen(
                 Switch(checked = rotate90, onCheckedChange = { rotate90 = it })
             }
 
+            Row(modifier = Modifier.fillMaxWidth().clickable { refreshTop = !refreshTop }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column { Text("Top Refresh Bar"); Text("Move refresh bar to the top of widget", style = MaterialTheme.typography.bodySmall) }
+                Switch(checked = refreshTop, onCheckedChange = { refreshTop = it })
+            }
+
             Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Zoom Factor", style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -610,7 +623,7 @@ fun ConfigScreen(
             val saveConfigColor = if (configChanged) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
             val configModifier = if (configChanged) Modifier.weight(1f).graphicsLayer { scaleX = pulseScale; scaleY = pulseScale } else Modifier.weight(1f)
             Button(
-                onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90, selectedTimeout) }, 
+                onClick = { onSave(url, clickUrl, selectedRate, selectedScale, manualOnly, selectedZoom, zoomCenterX, zoomCenterY, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90, selectedTimeout, refreshTop) }, 
                 modifier = configModifier,
                 colors = ButtonDefaults.buttonColors(containerColor = saveConfigColor)
             ) { Text("Save Config") }
@@ -658,7 +671,7 @@ fun ConfigScreen(
             confirmButton = {
                 TextButton(onClick = {
                     if (profileName.isNotBlank()) {
-                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, if(manualOnly) -1 else selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90, selectedTimeout))
+                        val isSaved = WidgetState.saveProfile(context, WidgetState.WidgetProfile(profileName, url, clickUrl, if(manualOnly) -1 else selectedRate, selectedScale, selectedZoom, zoomCenterX, zoomCenterY, manualOnly, skipNight, skipStart, skipEnd, discreteTimes.joinToString(","), rotate90, selectedTimeout, refreshTop))
                         if (isSaved) {
                             Toast.makeText(context, "Profile '$profileName' saved successfully", Toast.LENGTH_SHORT).show()
                         } else {
